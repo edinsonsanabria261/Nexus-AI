@@ -1,0 +1,25 @@
+# Entorno
+.env
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Datos generados
+data/faiss_index/
+*.faiss
+*.pkl
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.log
+
+# IDEs
+.vscode/
+.idea/
+*.swp
