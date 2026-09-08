@@ -1,3 +1,21 @@
+"""
+Configuración central del proyecto NexusSec AI
+"""
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# === API Keys ===
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
+# === Identidad del bot ===
+BOT_NAME = os.getenv("BOT_NAME", "NexusSec AI")
+OWNER_NAME = os.getenv("OWNER_NAME", "Edinson")
+
+# === System Prompt (nivel bajo de censura) ===
 SYSTEM_PROMPT = f"""Eres **{BOT_NAME}**, un asistente de élite en ciberseguridad y desarrollo de software creado por {OWNER_NAME}.
 
 Tu conocimiento cubre:
@@ -21,3 +39,7 @@ Reglas de comportamiento:
 
 Eres una herramienta de conocimiento avanzado. Tu objetivo es ser lo más útil y preciso posible.
 """
+
+# === Configuración de búsqueda ===
+MAX_SEARCH_RESULTS = 4
+MAX_PAGE_CHARS = 3000
