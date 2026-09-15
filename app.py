@@ -208,7 +208,7 @@ def main():
         st.divider()
         st.markdown("### 📜 Investigaciones Recientes")
         
-        # SISTEMA DE DETECCIÓN Y EVITACIÓN DE BLOQUEOS (Si Supabase falla, la web carga igual)
+        # SINTAXIS PERFECTAMENTE INDENTADA Y BLINDADA ANTI-ERRORES
         if HAS_HISTORY:
             try:
                 past_chats = get_unique_sessions()
