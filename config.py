@@ -13,7 +13,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 # CORRECCIÓN DEFINITIVA: Forzamos el uso de un modelo nativo real de Groq con 128k de contexto.
 # Esto reemplaza al string inválido 'openai/gpt-oss-120b' que rompía las llamadas de la base de datos.
-GROQ_MODEL = "llama-3.1-70b-versatile"
+GROQ_MODEL = "llama3-70b-8192"
 
 # === Identidad del Entorno ===
 BOT_NAME = os.getenv("BOT_NAME", "IA de NexusSec")
