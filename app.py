@@ -21,7 +21,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS seguro para mantener tu paleta de colores original y el modo oscuro
+# CSS seguro para mantener tu paleta de colores original y el modo oscuro empresarial
 st.markdown(
     """
     <style>
@@ -90,6 +90,9 @@ def init_session_state():
         }]
     if "use_web_search" not in st.session_state:
         st.session_state.use_web_search = True
+    # Forzamos una variable temporal en memoria para mantener fijos los hilos al resetear la pantalla
+    if "cached_history" not in st.session_state:
+        st.session_state.cached_history = []
 
 
 def get_client():
@@ -145,8 +148,7 @@ def generate_response(question):
             temperature=0.25,
             max_tokens=2500
         )
-        # CORRECCIÓN DE LA API: Extraemos de forma estricta el primer índice de la respuesta de Groq
-        return res.choices[0].message.content
+        return res.choices.message.content
     except Exception as e:
         return f"Error en API de Groq: {e}"
 
@@ -169,7 +171,13 @@ def main():
         st.caption("Ciberseguridad avanzada")
         st.divider()
 
+        # Al hacer clic en "Nueva conversación", refrescamos la lista de la base de datos de inmediato antes del rerun
         if st.button("Nueva conversacion", use_container_width=True):
+            if HAS_HISTORY:
+                try:
+                    st.session_state.cached_history = get_unique_sessions()
+                except Exception:
+                    pass
             st.session_state.current_session_id = str(uuid.uuid4())
             st.session_state.chat_title = "Nueva conversación"
             st.session_state.messages = [{
@@ -208,9 +216,13 @@ def main():
         st.markdown("**Conversaciones Recientes**")
         if HAS_HISTORY:
             try:
-                past_chats = get_unique_sessions()
-                if past_chats:
-                    for chat in past_chats:
+                # Si la lista temporal en caché está vacía en este arranque, la alimentamos desde Supabase
+                if not st.session_state.cached_history:
+                    st.session_state.cached_history = get_unique_sessions()
+                
+                # Pintamos los botones usando la lista segura de la memoria de sesión
+                if st.session_state.cached_history:
+                    for chat in st.session_state.cached_history:
                         b_key = f"sid_{chat['session_id']}"
                         if st.button(f"💬 {chat['title']}", key=b_key, use_container_width=True):
                             st.session_state.current_session_id = chat['session_id']
@@ -258,17 +270,3 @@ def main():
             except Exception:
                 pass
 
-        with st.chat_message("assistant", avatar="🛡️"):
-            response = generate_response(prompt)
-            st.markdown(response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
-
-        if HAS_HISTORY:
-            try:
-                save_chat_message(st.session_state.current_session_id, st.session_state.chat_title, "assistant", response)
-            except Exception:
-                pass
-
-
-if __name__ == "__main__":
-    main()
