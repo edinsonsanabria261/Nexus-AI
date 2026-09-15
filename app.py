@@ -108,64 +108,92 @@ st.markdown("""
     /* ========== Código ========== */
     code {
         background-color: #2d2d2d !important;
+st.markdown("""
+<style>
+    /* Fondo principal */
+    .stApp {
+        background-color: #0d0d0d !important;
+        color: #f1f3f4 !important;
+    }
+
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #161616 !important;
+        border-right: 1px solid #333 !important;
+    }
+    section[data-testid="stSidebar"] * {
+        color: #f1f3f4 !important;
+    }
+
+    /* Títulos y textos */
+    h1, h2, h3, h4, h5, h6, p, span, label, .stMarkdown {
+        color: #f1f3f4 !important;
+    }
+
+    /* Header */
+    .main-header {
+        background: #1c1c1c;
+        padding: 1.2rem 1.6rem;
+        border-radius: 16px;
+        border: 1px solid #3a3a3a;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+    .main-header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #ffffff !important;
+    }
+    .main-header p {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #b0b3b8 !important;
+    }
+
+    /* Mensajes del chat */
+    div[data-testid="stChatMessage"] {
+        background-color: transparent !important;
+        color: #f1f3f4 !important;
+    }
+
+    /* Input */
+    .stChatInput textarea {
+        background-color: #1f1f1f !important;
+        color: #ffffff !important;
+        border: 1px solid #444 !important;
+        border-radius: 24px !important;
+    }
+
+    /* Botones */
+    .stButton > button {
+        background-color: #2a2a2a !important;
+        color: #ffffff !important;
+        border: 1px solid #555 !important;
+        border-radius: 12px !important;
+        font-weight: 500;
+    }
+    .stButton > button:hover {
+        background-color: #3a3a3a !important;
+        border-color: #777 !important;
+    }
+
+    /* Código */
+    code {
+        background-color: #2a2a2a !important;
         color: #8ab4f8 !important;
-        padding: 0.2rem 0.45rem;
+        padding: 3px 7px;
         border-radius: 6px;
-        transition: all 0.2s ease;
     }
 
-    /* ========== Scrollbar ========== */
-    ::-webkit-scrollbar {
-        width: 8px;
-    }
-    ::-webkit-scrollbar-track {
-        background: #1a1a1a;
-    }
-    ::-webkit-scrollbar-thumb {
-        background: #3c4043;
-        border-radius: 4px;
-        transition: background 0.3s ease;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: #5f6368;
-    }
-
-    /* ========== Animaciones ========== */
-    @keyframes fadeInDown {
-        from {
-            opacity: 0;
-            transform: translateY(-12px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
-    }
-
-    /* ========== Separadores ========== */
-    hr {
-        border-color: #2d2d2d !important;
-        transition: all 0.3s ease;
+    /* Toggle y textos pequeños */
+    .stToggle label, .stCaption, small {
+        color: #c5c7ca !important;
     }
 </style>
 """, unsafe_allow_html=True)
-
 
 def init_session_state():
     if "messages" not in st.session_state:
