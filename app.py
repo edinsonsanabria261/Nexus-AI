@@ -86,7 +86,7 @@ def init_session_state():
     if "messages" not in st.session_state:
         st.session_state.messages = [{
             "role": "assistant",
-            "content": f"Hola, soy **{config.BOT_NAME}** 🛡️\n\nAsistente de ciberseguridad con memoria persistente.\n\nPuedes enseñarme con:\n`recuerda esto: [texto]`\n\n¿En qué puedo ayudarte?"
+            "content": f"Hola, soy **{config.BOT_NAME}** 🛡️\n\nInteligencia Artificial para ciberseguridad con memoria persistente.\n\nPuedes enseñarme con:\n`recuerda esto: [texto]`\n\n¿En qué puedo ayudarte?"
         }]
     if "use_web_search" not in st.session_state:
         st.session_state.use_web_search = True
@@ -145,9 +145,10 @@ def generate_response(question):
             temperature=0.25,
             max_tokens=2500
         )
-        return res.choices.message.content
+        # CORRECCIÓN DE LA API: Extraemos de forma estricta el primer índice de la respuesta de Groq
+        return res.choices[0].message.content
     except Exception as e:
-        return f"Error: {e}"
+        return f"Error en API de Groq: {e}"
 
 
 def main():
@@ -158,7 +159,7 @@ def main():
         <div style="font-size: 1.9rem;">🛡️</div>
         <div>
             <h1>{config.BOT_NAME}</h1>
-            <p>Asistente de Ciberseguridad Experto</p>
+            <p>Inteligencia Artificial de Ciberseguridad</p>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -203,7 +204,6 @@ def main():
                         st.error("No se pudo extraer texto legible del archivo.")
                 st.session_state[f_key] = True
 
-        # PANEL DE CONVERSACIONES RECIPROCADO PERMANENTE
         st.divider()
         st.markdown("**Conversaciones Recientes**")
         if HAS_HISTORY:
