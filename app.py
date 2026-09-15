@@ -97,7 +97,7 @@ def generate_response(question, provider):
         if provider == "OpenAI (GPT-4o)":
             if not config.OPENAI_API_KEY:
                 return "❌ Error: Falta 'OPENAI_API_KEY' en tu panel de variables de Render para usar GPT-4o."
-            from openai import OpenAI  # Importación dinámica segura
+            from openai import OpenAI
             client = OpenAI(api_key=config.OPENAI_API_KEY)
             messages = [{"role": "system", "content": custom_system_prompt}]
             for msg in st.session_state.messages[-6:]:
@@ -110,7 +110,7 @@ def generate_response(question, provider):
         elif provider == "Anthropic (Claude 3.5 Sonnet)":
             if not config.ANTHROPIC_API_KEY:
                 return "❌ Error: Falta 'ANTHROPIC_API_KEY' en tu panel de variables de Render para usar Claude 3.5."
-            from anthropic import Anthropic  # Importación dinámica segura
+            from anthropic import Anthropic
             client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
             messages = []
             for msg in st.session_state.messages[-6:]:
@@ -200,14 +200,15 @@ def main():
 
         st.divider()
         st.markdown("### 📜 Investigaciones Recientes")
-        past_chats = get_unique_sessions()
-        if past_chats:
-            for chat in past_chats:
-                button_key = f"btn_{chat['session_id']}"
-                if st.button(f"💬 {chat['title']}", key=button_key, use_container_width=True):
-                    st.session_state.current_session_id = chat['session_id']
-                    st.session_state.chat_title = chat['title']
-                    db_messages = load_session_messages(chat['session_id'])
-                    if db_messages:
-                        st.session_state.messages = db_messages
-                    st.rerun()
+        try:
+            past_chats = get_unique_sessions()
+            if past_chats:
+                for chat in past_chats:
+                    button_key = f"btn_{chat['session_id']}"
+                    if st.button(f"💬 {chat['title']}", key=button_key, use_container_width=True):
+                        st.session_state.current_session_id = chat['session_id']
+                        st.session_state.chat_title = chat['title']
+                        db_messages = load_session_messages(chat['session_id'])
+                        if db_messages:
+                            st.session_state.messages = db_messages
+                        st.rerun()
