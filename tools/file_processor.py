@@ -10,8 +10,10 @@ import openpyxl
 def process_and_index_file(file_contents: bytes, filename: str) -> int:
     """
     Procesa un archivo binario de CUALQUIER formato común (PDF, Word, Excel, Código), 
-    extrae su texto y lo indexa semánticamente en Supabase de forma automatizada.
+    extrae su texto y lo indexa semánticamente en Supabase forzando el formato numérico estricto.
     """
+    # Cargamos en memoria limpia para evitar lecturas vacías de 0 bytes por Streamlit
+    file_bytes_stream = io.BytesIO(file_contents)
     text_by_page = []
     fn_lower = filename.lower()
     
@@ -20,8 +22,7 @@ def process_and_index_file(file_contents: bytes, filename: str) -> int:
     # === Formato: PDF ===
     if fn_lower.endswith('.pdf'):
         try:
-            pdf_file = io.BytesIO(file_contents)
-            reader = PdfReader(pdf_file)
+            reader = PdfReader(file_bytes_stream)
             for page_num, page in enumerate(reader.pages, start=1):
                 page_text = page.extract_text()
                 if page_text and page_text.strip():
@@ -33,8 +34,7 @@ def process_and_index_file(file_contents: bytes, filename: str) -> int:
     # === Formato: Word (.docx y .doc) ===
     elif fn_lower.endswith('.docx') or fn_lower.endswith('.doc'):
         try:
-            word_file = io.BytesIO(file_contents)
-            text = docx2txt.process(word_file)
+            text = docx2txt.process(file_bytes_stream)
             if text and text.strip():
                 text_by_page.append((text, 1))
         except Exception as e:
@@ -44,15 +44,13 @@ def process_and_index_file(file_contents: bytes, filename: str) -> int:
     # === Formato: Excel (.xlsx) ===
     elif fn_lower.endswith('.xlsx'):
         try:
-            excel_file = io.BytesIO(file_contents)
-            wb = openpyxl.load_workbook(excel_file, data_only=True)
+            wb = openpyxl.load_workbook(file_bytes_stream, data_only=True)
             excel_text_parts = []
             
             for sheet in wb.sheetnames:
                 ws = wb[sheet]
                 excel_text_parts.append(f"--- Hoja: {sheet} ---")
                 for row in ws.iter_rows(values_only=True):
-                    # Filtramos filas vacías y unimos celdas por tabulador
                     row_text = "\t".join([str(cell) for cell in row if cell is not None])
                     if row_text.strip():
                         excel_text_parts.append(row_text)
@@ -106,20 +104,23 @@ def process_and_index_file(file_contents: bytes, filename: str) -> int:
             formatted_content = f"[Archivo: {filename} | Pág: {page_num}]\n{chunk_text}"
             tags_info = f"file_upload:{filename}"
             
-            # Importación bajo demanda segura para el entorno de Render
             import tools.memory as memory_module
             sb = memory_module.get_supabase()
             
             if sb:
                 try:
-                    embedding_vector = memory_module.model.encode(formatted_content).tolist()
+                    # Generamos los números del vector mediante el modelo de memory.py
+                    raw_vector = memory_module.model.encode(formatted_content)
+                    # CORRECCIÓN CRÍTICA: Forzamos la conversión estricta a floats puros para pgvector nativo
+                    embedding_vector = [float(x) for x in raw_vector]
+                    
                     data = {
                         "content": formatted_content,
                         "source": "file_upload",
                         "tags": tags_info,
-                        "embedding": embedding_vector,
+                        "embedding": embedding_vector, # Lista purificada
                         "filename": filename,
-                        "page_number": page_num
+                        "page_number": int(page_num)
                     }
                     sb.table("knowledge").insert(data).execute()
                     saved_chunks += 1
