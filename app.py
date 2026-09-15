@@ -200,15 +200,15 @@ def main():
 
         st.divider()
         st.markdown("### 📜 Investigaciones Recientes")
-        try:
-            past_chats = get_unique_sessions()
-            if past_chats:
-                for chat in past_chats:
-                    button_key = f"btn_{chat['session_id']}"
-                    if st.button(f"💬 {chat['title']}", key=button_key, use_container_width=True):
-                        st.session_state.current_session_id = chat['session_id']
-                        st.session_state.chat_title = chat['title']
-                        db_messages = load_session_messages(chat['session_id'])
-                        if db_messages:
-                            st.session_state.messages = db_messages
-                        st.rerun()
+        
+        # SINTAXIS SIMPLIFICADA Y LIMPIA DE HISTORIAL (Elimina el error de raíz)
+        past_chats = get_unique_sessions()
+        if past_chats:
+            for chat in past_chats:
+                button_key = f"btn_{chat['session_id']}"
+                if st.button(f"💬 {chat['title']}", key=button_key, use_container_width=True):
+                    st.session_state.current_session_id = chat['session_id']
+                    st.session_state.chat_title = chat['title']
+                    db_messages = load_session_messages(chat['session_id'])
+                    if db_messages:
+                        st.session_state.messages = db_messages
