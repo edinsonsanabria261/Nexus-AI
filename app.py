@@ -4,6 +4,7 @@ from datetime import datetime
 import config
 from tools.web_search import search_and_read
 from tools.memory import save_knowledge, search_knowledge
+from tools.file_processor import process_and_index_file  # Nuevo motor importado
 
 # Configuración de página limpia
 st.set_page_config(
@@ -45,7 +46,7 @@ def init_session_state():
     if "messages" not in st.session_state:
         st.session_state.messages = [{
             "role": "assistant",
-            "content": f"Hola, soy **{config.BOT_NAME}** 🛡️\n\nAsistente de ciberseguridad con memoria persistente.\n\nPuedes enseñarme con:\n`recuerda esto: [texto]`\n\n¿En qué puedo ayudarte?"
+            "content": f"Hola, soy **{config.BOT_NAME}** 🛡️\n\nAsistente de ciberseguridad con memoria persistente.\n\nPuedes enseñarme con:\n`recuerda esto: [texto]`\n\nO arrastrando reportes o scripts en el cargador de la barra lateral.\n\n¿En qué puedo ayudarte?"
         }]
     if "use_web_search" not in st.session_state:
         st.session_state.use_web_search = True
@@ -72,13 +73,13 @@ def generate_response(question):
             return "❌ Error al intentar conectar o guardar en la base de datos. Verifica la conexión externa."
         return "⚠️ Por favor, escribe información válida después del comando `recuerda esto:`"
 
-    # 1. Búsqueda en Base de Datos de Memoria (RAG)
-    memory_hits = search_knowledge(question, limit=4)
+    # 1. Búsqueda en Base de Datos de Memoria Semántica (RAG)
+    memory_hits = search_knowledge(question, limit=5)
     memory_text = ""
     if memory_hits:
         memory_text = "\n".join([f"- {m['content']}" for m in memory_hits])
 
-    # 2. Búsqueda de información en la Web
+    # 2. Búsqueda de información en la Web (OSINT)
     web_text = ""
     if st.session_state.use_web_search:
         with st.spinner("🔍 Rastreando fuentes web actualizadas..."):
@@ -88,32 +89,28 @@ def generate_response(question):
                 web_text = ""
 
     # 3. Construcción del Prompt del Sistema Dinámico
-    # Al inyectar el contexto aquí, la IA sabe de dónde viene la información y responde con propiedad.
     custom_system_prompt = config.SYSTEM_PROMPT
     if memory_text or web_text:
-        custom_system_prompt += "\n\n[CONTEXTO ADICIONAL RECUPERADO DE TUS SISTEMAS]"
+        custom_system_prompt += "\n\n[CONTEXTO EXTRACTO Y ACTUALIZADO DE TU ENTORNO]"
         if memory_text:
-            custom_system_prompt += f"\n- Conocimientos previos guardados en tu base de datos:\n{memory_text}"
+            custom_system_prompt += f"\n- Datos recuperados de tu memoria persistente (documentos/manuales):\n{memory_text}"
         if web_text:
-            custom_system_prompt += f"\n- Información en tiempo real recopilada de la Web:\n{web_text}"
-        custom_system_prompt += "\nUtiliza este contexto únicamente si es directamente relevante para responder la solicitud del usuario de forma técnica y precisa."
+            custom_system_prompt += f"\n- Inteligencia en tiempo real de internet:\n{web_text}"
+        custom_system_prompt += "\nUtiliza este contexto únicamente si guarda relación con la pregunta del usuario. Cita el archivo o URL si corresponde."
 
-    # Configurar el mensaje base del sistema modificado
     messages = [{"role": "system", "content": custom_system_prompt}]
     
-    # Mantener el historial de la conversación (Últimos 6 mensajes para control de tokens)
     for msg in st.session_state.messages[-6:]:
         if msg["role"] in ("user", "assistant"):
             messages.append({"role": msg["role"], "content": msg["content"]})
 
-    # Mensaje final del usuario limpio sin contaminación de metadatos
     messages.append({"role": "user", "content": question})
 
     try:
         res = client.chat.completions.create(
             model=config.GROQ_MODEL,
             messages=messages,
-            temperature=0.25,  # Bajado a 0.25 para asegurar mayor precisión técnica en ciberseguridad
+            temperature=0.25,
             max_tokens=2500
         )
         return res.choices[0].message.content
@@ -148,16 +145,41 @@ def main():
         st.divider()
         st.session_state.use_web_search = st.toggle("🌐 Módulo OSINT / Web Search", value=st.session_state.use_web_search)
 
+        # NUEVO COMPONENTE: Cargador de documentos multimodal estilo Gemini
+        st.divider()
+        st.markdown("### 📁 Analizador Multimodal")
+        st.caption("Sube reportes PDF, código (.py, .js) o notas (.txt)")
+        uploaded_file = st.file_uploader(
+            "Cargar archivo para indexar", 
+            type=["pdf", "txt", "py", "js", "json", "md"],
+            label_visibility="collapsed"
+        )
+        
+        if uploaded_file is not None:
+            # Procesamos el archivo solo una vez controlando con session_state
+            file_key = f"processed_{uploaded_file.name}_{uploaded_file.size}"
+            if file_key not in st.session_state:
+                with st.spinner(f"Indexando semánticamente {uploaded_file.name}..."):
+                    file_bytes = uploaded_file.read()
+                    chunks_saved = process_and_index_file(file_bytes, uploaded_file.name)
+                    
+                    if chunks_saved > 0:
+                        st.success(f"✅ ¡{uploaded_file.name} procesado! {chunks_saved} bloques guardados en Supabase.")
+                        # Insertamos aviso en la conversación para alertar al usuario
+                        st.session_state.messages.append({
+                            "role": "assistant",
+                            "content": f"⚙️ **Sistema:** He terminado de devorar e indexar el archivo `{uploaded_file.name}` ({chunks_saved} bloques semánticos creados). Ya puedes hacerme consultas sobre su contenido."
+                        })
+                    else:
+                        st.error("❌ No se pudo extraer texto válido del archivo.")
+                st.session_state[file_key] = True
+
         st.divider()
         st.markdown("**Core LLM Engine:**")
         st.code(config.GROQ_MODEL, language=None)
 
         st.divider()
-        st.markdown("**Comando Base de Aprendizaje:**")
-        st.code("recuerda esto: <información>", language=None)
-
-        st.divider()
-        st.caption(f"Versión Actual: v0.3")
+        st.caption(f"Versión Actual: v0.4 (Multimodal)")
         st.caption(f"Desarrollado de forma élite por {config.OWNER_NAME}")
 
     # Renderizar el feed histórico del chat
