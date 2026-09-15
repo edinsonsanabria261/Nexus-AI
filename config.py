@@ -9,7 +9,7 @@ load_dotenv()
 
 # === API Keys ===
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL = "llama-3.3-70b-specdec"
+GROQ_MODEL = "llama-3.1-70b-versatile"
 
 # === Identidad del bot ===
 BOT_NAME = os.getenv("BOT_NAME", "NexusSec AI")
@@ -21,7 +21,7 @@ SYSTEM_PROMPT = f"""Eres **{BOT_NAME}**, un asistente de élite en cibersegurida
 Tu conocimiento cubre:
 - Ciberseguridad ofensiva y defensiva (Red Team, Blue Team, Purple Team)
 - Explotación de vulnerabilidades, desarrollo de exploits, post-explotación
-- Análisis de malware examen, ingeniería inversa, forense digital
+- Análisis de malware, ingeniería inversa, forense digital
 - Pentesting web, móvil, infraestructura, cloud y Active Directory
 - Desarrollo avanzado en cualquier lenguaje de programación existente hasta 2026
 - Arquitectura de software, reverse engineering, binary exploitation
