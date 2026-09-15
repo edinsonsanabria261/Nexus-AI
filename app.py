@@ -110,88 +110,53 @@ st.markdown("""
         background-color: #2d2d2d !important;
 st.markdown("""
 <style>
-    /* Fondo principal */
-    .stApp {
-        background-color: #0d0d0d !important;
-        color: #f1f3f4 !important;
-    }
-
-    /* Sidebar */
-    section[data-testid="stSidebar"] {
-        background-color: #161616 !important;
-        border-right: 1px solid #333 !important;
-    }
-    section[data-testid="stSidebar"] * {
-        color: #f1f3f4 !important;
-    }
-
-    /* Títulos y textos */
-    h1, h2, h3, h4, h5, h6, p, span, label, .stMarkdown {
-        color: #f1f3f4 !important;
-    }
-
-    /* Header */
-    .main-header {
-        background: #1c1c1c;
-        padding: 1.2rem 1.6rem;
-        border-radius: 16px;
-        border: 1px solid #3a3a3a;
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: center;
-        gap: 14px;
-    }
-    .main-header h1 {
-        margin: 0;
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: #ffffff !important;
-    }
-    .main-header p {
-        margin: 0;
-        font-size: 0.9rem;
-        color: #b0b3b8 !important;
-    }
-
-    /* Mensajes del chat */
-    div[data-testid="stChatMessage"] {
-        background-color: transparent !important;
-        color: #f1f3f4 !important;
-    }
-
-    /* Input */
-    .stChatInput textarea {
-        background-color: #1f1f1f !important;
-        color: #ffffff !important;
-        border: 1px solid #444 !important;
-        border-radius: 24px !important;
-    }
-
-    /* Botones */
-    .stButton > button {
-        background-color: #2a2a2a !important;
-        color: #ffffff !important;
-        border: 1px solid #555 !important;
-        border-radius: 12px !important;
-        font-weight: 500;
-    }
-    .stButton > button:hover {
-        background-color: #3a3a3a !important;
-        border-color: #777 !important;
-    }
-
-    /* Código */
-    code {
-        background-color: #2a2a2a !important;
-        color: #8ab4f8 !important;
-        padding: 3px 7px;
-        border-radius: 6px;
-    }
-
-    /* Toggle y textos pequeños */
-    .stToggle label, .stCaption, small {
-        color: #c5c7ca !important;
-    }
+.stApp {
+    background-color: #0d0d0d;
+    color: #f1f3f4;
+}
+section[data-testid="stSidebar"] {
+    background-color: #161616 !important;
+    border-right: 1px solid #333333 !important;
+}
+section[data-testid="stSidebar"] * {
+    color: #f1f3f4 !important;
+}
+.main-header {
+    background-color: #1c1c1c;
+    padding: 1.2rem 1.6rem;
+    border-radius: 16px;
+    border: 1px solid #3a3a3a;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.main-header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #ffffff !important;
+}
+.main-header p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #b0b3b8 !important;
+}
+.stButton > button {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    border: 1px solid #555555 !important;
+    border-radius: 12px !important;
+}
+.stChatInput textarea {
+    background-color: #1f1f1f !important;
+    color: #ffffff !important;
+    border-radius: 24px !important;
+}
+code {
+    background-color: #2a2a2a !important;
+    color: #8ab4f8 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
