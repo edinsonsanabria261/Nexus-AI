@@ -4,7 +4,6 @@ Módulo avanzado de extracción y segmentación de archivos (PDF, Código, Texto
 
 import io
 from pypdf import PdfReader
-from tools.memory import save_knowledge
 
 def process_and_index_file(file_contents: bytes, filename: str) -> int:
     """
@@ -58,16 +57,16 @@ def process_and_index_file(file_contents: bytes, filename: str) -> int:
             formatted_content = f"[Archivo: {filename} | Pág: {page_num}]\n{chunk_text}"
             
             # 3. Guardamos en la memoria semántica usando las funciones existentes
-            # Pasamos metadatos adicionales para enriquecer la búsqueda
-            # Modificamos la firma ligeramente o empaquetamos tags informativos
             tags_info = f"file_upload:{filename}"
             
-            # Guardamos directamente aprovechando el embedding local de memory.py
-            from tools.memory import get_supabase, model
-            sb = get_supabase()
+            # CORRECCIÓN DE IMPORTACIÓN: Importamos el módulo completo para evitar el ImportError
+            import tools.memory as memory_module
+            sb = memory_module.get_supabase()
+            
             if sb:
                 try:
-                    embedding_vector = model.encode(formatted_content).tolist()
+                    # Accedemos de forma directa y segura al modelo y sus funciones sin colisiones
+                    embedding_vector = memory_module.model.encode(formatted_content).tolist()
                     data = {
                         "content": formatted_content,
                         "source": "file_upload",
