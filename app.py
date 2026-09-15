@@ -15,22 +15,23 @@ st.set_page_config(
 # ========== CSS + HTML Diseño Mejorado ==========
 st.markdown("""
 <style>
-    /* Fondo general */
+    /* ========== Fondo y base ========== */
     .stApp {
         background-color: #0f0f0f;
         color: #e8eaed;
     }
 
-    /* Sidebar */
+    /* ========== Sidebar ========== */
     section[data-testid="stSidebar"] {
         background-color: #171717 !important;
         border-right: 1px solid #2d2d2d;
+        transition: all 0.3s ease;
     }
     section[data-testid="stSidebar"] * {
         color: #e8eaed !important;
     }
 
-    /* Header principal */
+    /* ========== Header con animación ========== */
     .main-header {
         background: linear-gradient(90deg, #1a1a1a, #252525);
         padding: 1.2rem 1.6rem;
@@ -40,6 +41,12 @@ st.markdown("""
         display: flex;
         align-items: center;
         gap: 14px;
+        animation: fadeInDown 0.5s ease-out;
+        transition: all 0.3s ease;
+    }
+    .main-header:hover {
+        border-color: #444;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
     }
     .main-header h1 {
         margin: 0;
@@ -53,43 +60,61 @@ st.markdown("""
         color: #9aa0a6;
     }
 
-    /* Chat messages */
+    /* ========== Mensajes del chat ========== */
     div[data-testid="stChatMessage"] {
         background-color: transparent !important;
         padding: 0.6rem 0 !important;
+        animation: fadeInUp 0.35s ease-out;
+        transition: all 0.25s ease;
+    }
+    div[data-testid="stChatMessage"]:hover {
+        transform: translateX(4px);
     }
 
-    /* Input estilo cápsula */
+    /* ========== Input estilo cápsula ========== */
     .stChatInput {
         border-radius: 28px !important;
+        transition: all 0.3s ease;
+    }
+    .stChatInput:focus-within {
+        box-shadow: 0 0 0 2px rgba(138, 180, 248, 0.3);
     }
     .stChatInput textarea {
         border-radius: 28px !important;
         padding-left: 18px !important;
+        transition: all 0.3s ease;
     }
 
-    /* Botones */
+    /* ========== Botones con animación ========== */
     .stButton > button {
         border-radius: 12px !important;
         border: 1px solid #3c4043 !important;
         background-color: #2d2d2d !important;
         color: #e8eaed !important;
-        transition: all 0.2s ease;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
     }
     .stButton > button:hover {
         background-color: #3c4043 !important;
         border-color: #5f6368 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .stButton > button:active {
+        transform: translateY(0);
     }
 
-    /* Código */
+    /* ========== Código ========== */
     code {
         background-color: #2d2d2d !important;
         color: #8ab4f8 !important;
         padding: 0.2rem 0.45rem;
         border-radius: 6px;
+        transition: all 0.2s ease;
     }
 
-    /* Scrollbar */
+    /* ========== Scrollbar ========== */
     ::-webkit-scrollbar {
         width: 8px;
     }
@@ -99,11 +124,44 @@ st.markdown("""
     ::-webkit-scrollbar-thumb {
         background: #3c4043;
         border-radius: 4px;
+        transition: background 0.3s ease;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #5f6368;
     }
 
-    /* Separadores */
+    /* ========== Animaciones ========== */
+    @keyframes fadeInDown {
+        from {
+            opacity: 0;
+            transform: translateY(-12px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
+    /* ========== Separadores ========== */
     hr {
         border-color: #2d2d2d !important;
+        transition: all 0.3s ease;
     }
 </style>
 """, unsafe_allow_html=True)
