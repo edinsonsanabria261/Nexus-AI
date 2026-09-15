@@ -79,7 +79,6 @@ st.markdown(
 
 
 def init_session_state():
-    # Identificadores de sesión únicos para gestionar múltiples chats
     if "current_session_id" not in st.session_state:
         st.session_state.current_session_id = str(uuid.uuid4())
     if "chat_title" not in st.session_state:
@@ -87,7 +86,7 @@ def init_session_state():
     if "messages" not in st.session_state:
         st.session_state.messages = [{
             "role": "assistant",
-            "content": f"Hola, soy **{config.BOT_NAME}** 🛡️\n\nAsistente de ciberseguridad con memoria persistente e historial de chats.\n\nPuedes enseñarme con:\n`recuerda esto: [texto]`\n\n¿En qué puedo ayudarte?"
+            "content": f"Hola, soy **{config.BOT_NAME}** 🛡️\n\nAsistente de ciberseguridad con memoria persistente.\n\nPuedes enseñarme con:\n`recuerda esto: [texto]`\n\n¿En qué puedo ayudarte?"
         }]
     if "use_web_search" not in st.session_state:
         st.session_state.use_web_search = True
@@ -106,7 +105,7 @@ def generate_response(question):
 
     q_lower = question.lower().strip()
     if q_lower.startswith("recuerda esto:") or q_lower.startswith("recuerda esto :"):
-        knowledge = question.split(":", 1)[1].strip()
+        knowledge = question.split(":", 1).strip()
         if knowledge:
             ok = save_knowledge(knowledge, source="user", tags="manual")
             if ok:
@@ -146,7 +145,7 @@ def generate_response(question):
             temperature=0.25,
             max_tokens=2500
         )
-        return res.choices[0].message.content
+        return res.choices.message.content
     except Exception as e:
         return f"Error: {e}"
 
@@ -169,7 +168,6 @@ def main():
         st.caption("Ciberseguridad avanzada")
         st.divider()
 
-        # Botón para forzar una conversación limpia con una nueva sesión
         if st.button("Nueva conversacion", use_container_width=True):
             st.session_state.current_session_id = str(uuid.uuid4())
             st.session_state.chat_title = "Nueva conversación"
@@ -182,7 +180,6 @@ def main():
         st.divider()
         st.session_state.use_web_search = st.toggle("Buscar en la web", value=st.session_state.use_web_search)
 
-        # Analizador de Documentos Universales
         st.divider()
         st.markdown("**Analizador Multimodal**")
         uploaded_file = st.file_uploader(
@@ -206,7 +203,7 @@ def main():
                         st.error("No se pudo extraer texto legible del archivo.")
                 st.session_state[f_key] = True
 
-        # PANEL DE CONVERSACIONES RECIPROCADO (Lista limpia de botones sin selectbox rotos)
+        # PANEL DE CONVERSACIONES RECIPROCADO PERMANENTE
         st.divider()
         st.markdown("**Conversaciones Recientes**")
         if HAS_HISTORY:
@@ -248,11 +245,9 @@ def main():
             st.markdown(msg["content"])
 
     if prompt := st.chat_input(f"Pregunta a {config.BOT_NAME}..."):
-        # El primer mensaje define el título permanente del hilo en el historial
         if len(st.session_state.messages) <= 1:
             st.session_state.chat_title = prompt[:30]
 
-        # Guardar y renderizar entrada de usuario
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user", avatar="👤"):
             st.markdown(prompt)
@@ -263,7 +258,6 @@ def main():
             except Exception:
                 pass
 
-        # Generar, renderizar y guardar respuesta del asistente
         with st.chat_message("assistant", avatar="🛡️"):
             response = generate_response(prompt)
             st.markdown(response)
@@ -273,3 +267,8 @@ def main():
             try:
                 save_chat_message(st.session_state.current_session_id, st.session_state.chat_title, "assistant", response)
             except Exception:
+                pass
+
+
+if __name__ == "__main__":
+    main()
