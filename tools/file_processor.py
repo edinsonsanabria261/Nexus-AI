@@ -10,16 +10,13 @@ import openpyxl
 def process_and_index_file(file_contents: bytes, filename: str) -> int:
     """
     Procesa un archivo binario de CUALQUIER formato común (PDF, Word, Excel, Código), 
-    extrae su texto y lo indexa semánticamente en Supabase forzando el formato numérico estricto.
+    extrae su texto y lo indexa semánticamente en Supabase usando la API externa de embeddings.
     """
-    # Cargamos en memoria limpia para evitar lecturas vacías de 0 bytes por Streamlit
     file_bytes_stream = io.BytesIO(file_contents)
     text_by_page = []
     fn_lower = filename.lower()
     
     # 1. EXTRACTOR MULTIFORMATO INTELIGENTE
-    
-    # === Formato: PDF ===
     if fn_lower.endswith('.pdf'):
         try:
             reader = PdfReader(file_bytes_stream)
@@ -31,7 +28,6 @@ def process_and_index_file(file_contents: bytes, filename: str) -> int:
             print(f"[file_processor] Error leyendo PDF ({filename}): {e}")
             return 0
             
-    # === Formato: Word (.docx y .doc) ===
     elif fn_lower.endswith('.docx') or fn_lower.endswith('.doc'):
         try:
             text = docx2txt.process(file_bytes_stream)
@@ -41,12 +37,10 @@ def process_and_index_file(file_contents: bytes, filename: str) -> int:
             print(f"[file_processor] Error leyendo Word ({filename}): {e}")
             return 0
 
-    # === Formato: Excel (.xlsx) ===
     elif fn_lower.endswith('.xlsx'):
         try:
             wb = openpyxl.load_workbook(file_bytes_stream, data_only=True)
             excel_text_parts = []
-            
             for sheet in wb.sheetnames:
                 ws = wb[sheet]
                 excel_text_parts.append(f"--- Hoja: {sheet} ---")
@@ -54,40 +48,34 @@ def process_and_index_file(file_contents: bytes, filename: str) -> int:
                     row_text = "\t".join([str(cell) for cell in row if cell is not None])
                     if row_text.strip():
                         excel_text_parts.append(row_text)
-                        
             full_excel_text = "\n".join(excel_text_parts)
             if full_excel_text.strip():
                 text_by_page.append((full_excel_text, 1))
         except Exception as e:
             print(f"[file_processor] Error leyendo Excel ({filename}): {e}")
             return 0
-
-    # === Formatos de Texto Plano y Código (.py, .js, .txt, .json, .md, .html, etc.) ===
     else:
         plain_text = ""
         encodings_to_try = ["utf-8", "latin-1", "iso-8859-15", "cp1252"]
-        
         for enc in encodings_to_try:
             try:
                 plain_text = file_contents.decode(enc)
                 break
             except UnicodeDecodeError:
                 continue
-                
         if not plain_text:
             try:
                 plain_text = file_contents.decode("utf-8", errors="ignore")
             except Exception:
                 print(f"[file_processor] Error fatal de decodificación en {filename}")
                 return 0
-
         if plain_text.strip():
             text_by_page.append((plain_text, 1))
 
     if not text_by_page:
         return 0
 
-    # 2. SEGMENTACIÓN SEMÁNTICA (CHUNKING) CON SOLAPAMIENTO
+    # 2. SEGMENTACIÓN SEMÁNTICA (CHUNKING) Y CARGA A SUPABASE
     chunk_size = 600
     overlap = 150
     saved_chunks = 0
@@ -109,21 +97,20 @@ def process_and_index_file(file_contents: bytes, filename: str) -> int:
             
             if sb:
                 try:
-                    # Generamos los números del vector mediante el modelo de memory.py
-                    raw_vector = memory_module.model.encode(formatted_content)
-                    # CORRECCIÓN CRÍTICA: Forzamos la conversión estricta a floats puros para pgvector nativo
-                    embedding_vector = [float(x) for x in raw_vector]
+                    # Llamamos a la nueva función externa que no consume RAM de tu Render
+                    embedding_vector = memory_module.obtener_embedding_externo(formatted_content)
                     
-                    data = {
-                        "content": formatted_content,
-                        "source": "file_upload",
-                        "tags": tags_info,
-                        "embedding": embedding_vector, # Lista purificada
-                        "filename": filename,
-                        "page_number": int(page_num)
-                    }
-                    sb.table("knowledge").insert(data).execute()
-                    saved_chunks += 1
+                    if embedding_vector:
+                        data = {
+                            "content": formatted_content,
+                            "source": "file_upload",
+                            "tags": tags_info,
+                            "embedding": embedding_vector,
+                            "filename": filename,
+                            "page_number": int(page_num)
+                        }
+                        sb.table("knowledge").insert(data).execute()
+                        saved_chunks += 1
                 except Exception as ex:
                     print(f"[file_processor] Error inyectando chunk en Supabase: {ex}")
 
