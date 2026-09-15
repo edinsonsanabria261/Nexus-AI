@@ -74,7 +74,7 @@ def init_session_state():
     if "messages" not in st.session_state:
         st.session_state.messages = [{
             "role": "assistant",
-            "content": f"Hola, soy **{config.BOT_NAME}** 🛡 Corta de raíz los problemas. Dispuesto para auditar código, reportes e infraestructura.\n\nPuedes enseñarme con:\n`recuerda esto: [texto]`\n\n¿En qué puedo ayudarte?"
+            "content": f"Hola, soy **{config.BOT_NAME}** 🛡️\n\nAsistente de ciberseguridad con memoria persistente.\n\nPuedes enseñarme con:\n`recuerda esto: [texto]`\n\n¿En qué puedo ayudarte?"
         }]
     if "use_web_search" not in st.session_state:
         st.session_state.use_web_search = True
@@ -101,13 +101,13 @@ def generate_response(question):
             return "Error al guardar en Supabase. Revisa la conexion."
         return "Escribe algo despues de 'recuerda esto:'"
 
-    # 1. Recuperación de conocimiento mediante la base de datos Supabase
+    # 1. Búsqueda semántica en Supabase
     memory_hits = search_knowledge(question, limit=4)
     memory_text = ""
     if memory_hits:
         memory_text = "\n".join([f"- {m['content']}" for m in memory_hits])
 
-    # 2. Módulo de búsqueda web en vivo (OSINT)
+    # 2. Búsqueda web (OSINT)
     web_text = ""
     if st.session_state.use_web_search:
         with st.spinner("Buscando informacion..."):
@@ -116,7 +116,7 @@ def generate_response(question):
             except Exception:
                 web_text = ""
 
-    # 3. Ensamblaje del prompt del sistema estructurado
+    # 3. Contexto inyectado al LLM
     messages = [{"role": "system", "content": config.SYSTEM_PROMPT}]
     for msg in st.session_state.messages[-6:]:
         if msg["role"] in ("user", "assistant"):
@@ -171,15 +171,15 @@ def main():
         st.divider()
         st.session_state.use_web_search = st.toggle("Buscar en la web", value=st.session_state.use_web_search)
 
-        # Módulo Analizador Multimodal recuperado para admitir los PDFs y formatos universales
+        # Analizador de Documentos Universales
         st.divider()
         st.markdown("**Analizador Multimodal**")
         uploaded_file = st.file_uploader(
-            "Sube un archivo para analizar",
+            "Cargar archivo:", 
             type=["pdf", "txt", "py", "js", "json", "md", "docx", "doc", "xlsx"],
             label_visibility="collapsed"
         )
-
+        
         if uploaded_file is not None:
             f_key = f"proc_{uploaded_file.name}_{uploaded_file.size}"
             if f_key not in st.session_state:
@@ -189,7 +189,7 @@ def main():
                         st.success(f"¡{uploaded_file.name} procesado! {saved} bloques guardados.")
                         st.session_state.messages.append({
                             "role": "assistant",
-                            "content": f"⚙️ **Sistema:** Archivo `{uploaded_file.name}` analizado con éxito ({saved} bloques). Ya puedes consultarme sobre su contenido."
+                            "content": f"⚙️ **Sistema:** El archivo `{uploaded_file.name}` ha sido indexado con éxito ({saved} bloques). Ya puedes consultarme sobre su contenido."
                         })
                     else:
                         st.error("No se pudo extraer texto legible del archivo.")
