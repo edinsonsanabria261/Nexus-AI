@@ -11,3 +11,4 @@ sentence-transformers>=3.0.0
 pypdf>=4.0.0
 tiktoken>=0.7.0
 html2text>=2024.2.26
+supabase>=2.4.0
