@@ -1,19 +1,24 @@
 """
-Módulo avanzado de extracción y segmentación de archivos (PDF, Código, Texto) para Nexus-AI
+Módulo universal de extracción y segmentación de archivos (PDF, DOCX, XLSX, Código, Texto) para Nexus-AI
 """
 
 import io
 from pypdf import PdfReader
+import docx2txt
+import openpyxl
 
 def process_and_index_file(file_contents: bytes, filename: str) -> int:
     """
-    Procesa un archivo binario, extrae su texto por páginas y lo indexa semánticamente en Supabase.
-    Devuelve la cantidad de bloques guardados con éxito. Incorpora tolerancia a fallos de codificación.
+    Procesa un archivo binario de CUALQUIER formato común (PDF, Word, Excel, Código), 
+    extrae su texto y lo indexa semánticamente en Supabase de forma automatizada.
     """
     text_by_page = []
+    fn_lower = filename.lower()
     
-    # 1. Extracción de contenido según el tipo de archivo
-    if filename.lower().endswith('.pdf'):
+    # 1. EXTRACTOR MULTIFORMATO INTELIGENTE
+    
+    # === Formato: PDF ===
+    if fn_lower.endswith('.pdf'):
         try:
             pdf_file = io.BytesIO(file_contents)
             reader = PdfReader(pdf_file)
@@ -24,20 +29,53 @@ def process_and_index_file(file_contents: bytes, filename: str) -> int:
         except Exception as e:
             print(f"[file_processor] Error leyendo PDF ({filename}): {e}")
             return 0
+            
+    # === Formato: Word (.docx y .doc) ===
+    elif fn_lower.endswith('.docx') or fn_lower.endswith('.doc'):
+        try:
+            word_file = io.BytesIO(file_contents)
+            text = docx2txt.process(word_file)
+            if text and text.strip():
+                text_by_page.append((text, 1))
+        except Exception as e:
+            print(f"[file_processor] Error leyendo Word ({filename}): {e}")
+            return 0
+
+    # === Formato: Excel (.xlsx) ===
+    elif fn_lower.endswith('.xlsx'):
+        try:
+            excel_file = io.BytesIO(file_contents)
+            wb = openpyxl.load_workbook(excel_file, data_only=True)
+            excel_text_parts = []
+            
+            for sheet in wb.sheetnames:
+                ws = wb[sheet]
+                excel_text_parts.append(f"--- Hoja: {sheet} ---")
+                for row in ws.iter_rows(values_only=True):
+                    # Filtramos filas vacías y unimos celdas por tabulador
+                    row_text = "\t".join([str(cell) for cell in row if cell is not None])
+                    if row_text.strip():
+                        excel_text_parts.append(row_text)
+                        
+            full_excel_text = "\n".join(excel_text_parts)
+            if full_excel_text.strip():
+                text_by_page.append((full_excel_text, 1))
+        except Exception as e:
+            print(f"[file_processor] Error leyendo Excel ({filename}): {e}")
+            return 0
+
+    # === Formatos de Texto Plano y Código (.py, .js, .txt, .json, .md, .html, etc.) ===
     else:
-        # SISTEMA COMPLETO DE TOLERANCIA PARA ARCHIVOS DE TEXTO Y CÓDIGO
         plain_text = ""
-        # Lista de codificaciones a probar de forma secuencial si falla la primera
         encodings_to_try = ["utf-8", "latin-1", "iso-8859-15", "cp1252"]
         
         for enc in encodings_to_try:
             try:
                 plain_text = file_contents.decode(enc)
-                break  # Si tiene éxito, rompemos el bucle
+                break
             except UnicodeDecodeError:
-                continue  # Si falla, intenta con la siguiente codificación
+                continue
                 
-        # Si todo falla, forzamos decodificación ignorando caracteres rotos
         if not plain_text:
             try:
                 plain_text = file_contents.decode("utf-8", errors="ignore")
@@ -51,7 +89,7 @@ def process_and_index_file(file_contents: bytes, filename: str) -> int:
     if not text_by_page:
         return 0
 
-    # 2. Segmentación en bloques semánticos (Chunking) con solapamiento
+    # 2. SEGMENTACIÓN SEMÁNTICA (CHUNKING) CON SOLAPAMIENTO
     chunk_size = 600
     overlap = 150
     saved_chunks = 0
@@ -68,7 +106,7 @@ def process_and_index_file(file_contents: bytes, filename: str) -> int:
             formatted_content = f"[Archivo: {filename} | Pág: {page_num}]\n{chunk_text}"
             tags_info = f"file_upload:{filename}"
             
-            # Importación segura bajo demanda del módulo de memoria
+            # Importación bajo demanda segura para el entorno de Render
             import tools.memory as memory_module
             sb = memory_module.get_supabase()
             
