@@ -1,10 +1,18 @@
 import streamlit as st
+import uuid
 from groq import Groq
 from datetime import datetime
 import config
 from tools.web_search import search_and_read
 from tools.memory import save_knowledge, search_knowledge
 from tools.file_processor import process_and_index_file
+
+# Importación segura del gestor de historial
+try:
+    from tools.history_manager import save_chat_message, get_unique_sessions, load_session_messages
+    HAS_HISTORY = True
+except Exception:
+    HAS_HISTORY = False
 
 st.set_page_config(
     page_title=config.BOT_NAME,
@@ -71,10 +79,15 @@ st.markdown(
 
 
 def init_session_state():
+    # Identificadores de sesión únicos para gestionar múltiples chats
+    if "current_session_id" not in st.session_state:
+        st.session_state.current_session_id = str(uuid.uuid4())
+    if "chat_title" not in st.session_state:
+        st.session_state.chat_title = "Nueva conversación"
     if "messages" not in st.session_state:
         st.session_state.messages = [{
             "role": "assistant",
-            "content": f"Hola, soy **{config.BOT_NAME}** 🛡️\n\nAsistente de ciberseguridad con memoria persistente.\n\nPuedes enseñarme con:\n`recuerda esto: [texto]`\n\n¿En qué puedo ayudarte?"
+            "content": f"Hola, soy **{config.BOT_NAME}** 🛡️\n\nAsistente de ciberseguridad con memoria persistente e historial de chats.\n\nPuedes enseñarme con:\n`recuerda esto: [texto]`\n\n¿En qué puedo ayudarte?"
         }]
     if "use_web_search" not in st.session_state:
         st.session_state.use_web_search = True
@@ -101,13 +114,9 @@ def generate_response(question):
             return "Error al guardar en Supabase. Revisa la conexion."
         return "Escribe algo despues de 'recuerda esto:'"
 
-    # 1. Búsqueda semántica en Supabase
     memory_hits = search_knowledge(question, limit=4)
-    memory_text = ""
-    if memory_hits:
-        memory_text = "\n".join([f"- {m['content']}" for m in memory_hits])
+    memory_text = "\n".join([f"- {m['content']}" for m in memory_hits]) if memory_hits else ""
 
-    # 2. Búsqueda web (OSINT)
     web_text = ""
     if st.session_state.use_web_search:
         with st.spinner("Buscando informacion..."):
@@ -116,7 +125,6 @@ def generate_response(question):
             except Exception:
                 web_text = ""
 
-    # 3. Contexto inyectado al LLM
     messages = [{"role": "system", "content": config.SYSTEM_PROMPT}]
     for msg in st.session_state.messages[-6:]:
         if msg["role"] in ("user", "assistant"):
@@ -161,7 +169,10 @@ def main():
         st.caption("Ciberseguridad avanzada")
         st.divider()
 
+        # Botón para forzar una conversación limpia con una nueva sesión
         if st.button("Nueva conversacion", use_container_width=True):
+            st.session_state.current_session_id = str(uuid.uuid4())
+            st.session_state.chat_title = "Nueva conversación"
             st.session_state.messages = [{
                 "role": "assistant",
                 "content": "Nueva conversacion iniciada. ¿En que puedo ayudarte?"
@@ -195,6 +206,29 @@ def main():
                         st.error("No se pudo extraer texto legible del archivo.")
                 st.session_state[f_key] = True
 
+        # PANEL DE CONVERSACIONES RECIPROCADO (Lista limpia de botones sin selectbox rotos)
+        st.divider()
+        st.markdown("**Conversaciones Recientes**")
+        if HAS_HISTORY:
+            try:
+                past_chats = get_unique_sessions()
+                if past_chats:
+                    for chat in past_chats:
+                        b_key = f"sid_{chat['session_id']}"
+                        if st.button(f"💬 {chat['title']}", key=b_key, use_container_width=True):
+                            st.session_state.current_session_id = chat['session_id']
+                            st.session_state.chat_title = chat['title']
+                            db_messages = load_session_messages(chat['session_id'])
+                            if db_messages:
+                                st.session_state.messages = db_messages
+                            st.rerun()
+                else:
+                    st.caption("No hay hilos grabados.")
+            except Exception:
+                st.caption("Historial temporalmente en pausa.")
+        else:
+            st.caption("Módulo de historial desactivado.")
+
         st.divider()
         st.markdown("**Modelo**")
         st.code(config.GROQ_MODEL, language=None)
@@ -214,16 +248,28 @@ def main():
             st.markdown(msg["content"])
 
     if prompt := st.chat_input(f"Pregunta a {config.BOT_NAME}..."):
+        # El primer mensaje define el título permanente del hilo en el historial
+        if len(st.session_state.messages) <= 1:
+            st.session_state.chat_title = prompt[:30]
+
+        # Guardar y renderizar entrada de usuario
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user", avatar="👤"):
             st.markdown(prompt)
+        
+        if HAS_HISTORY:
+            try:
+                save_chat_message(st.session_state.current_session_id, st.session_state.chat_title, "user", prompt)
+            except Exception:
+                pass
 
+        # Generar, renderizar y guardar respuesta del asistente
         with st.chat_message("assistant", avatar="🛡️"):
             response = generate_response(prompt)
             st.markdown(response)
-
         st.session_state.messages.append({"role": "assistant", "content": response})
 
-
-if __name__ == "__main__":
-    main()
+        if HAS_HISTORY:
+            try:
+                save_chat_message(st.session_state.current_session_id, st.session_state.chat_title, "assistant", response)
+            except Exception:
