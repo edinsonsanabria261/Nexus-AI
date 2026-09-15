@@ -23,7 +23,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Inyección estricta de CSS para forzar el modo oscuro empresarial desde el primer milisegundo
+# Inyección estricta de CSS para forzar el modo oscuro empresarial
 st.markdown(
     """
     <style>
@@ -70,7 +70,7 @@ def generate_response(question, provider):
     q_lower = question.lower().strip()
     
     if q_lower.startswith("recuerda esto:") or q_lower.startswith("recuerda esto :"):
-        knowledge = question.split(":", 1).strip()
+        knowledge = question.split(":", 1)[1].strip()
         if knowledge:
             ok = save_knowledge(knowledge, source="user", tags="manual")
             if ok:
@@ -112,7 +112,7 @@ def generate_response(question, provider):
                     messages.append({"role": msg["role"], "content": msg["content"]})
             messages.append({"role": "user", "content": question})
             res = client.chat.completions.create(model=config.MODEL_OPENAI, messages=messages, temperature=0.25)
-            return res.choices.message.content
+            return res.choices[0].message.content
 
         elif provider == "Anthropic (Claude 3.5 Sonnet)":
             if not config.ANTHROPIC_API_KEY:
@@ -125,7 +125,7 @@ def generate_response(question, provider):
                     messages.append({"role": msg["role"], "content": msg["content"]})
             messages.append({"role": "user", "content": question})
             res = client.messages.create(model=config.MODEL_ANTHROPIC, max_tokens=2500, temperature=0.25, system=custom_system_prompt, messages=messages)
-            return res.content.text
+            return res.content[0].text
 
         else:  # Groq por defecto
             if not config.GROQ_API_KEY:
@@ -137,7 +137,7 @@ def generate_response(question, provider):
                     messages.append({"role": msg["role"], "content": msg["content"]})
             messages.append({"role": "user", "content": question})
             res = client.chat.completions.create(model=config.MODEL_GROQ, messages=messages, temperature=0.25)
-            return res.choices.message.content
+            return res.choices[0].message.content
     except Exception as e:
         return f"❌ Error en la llamada al modelo ({provider}): {e}"
 
@@ -208,11 +208,12 @@ def main():
         st.divider()
         st.markdown("### 📜 Investigaciones Recientes")
         
-        # SINTAXIS PERFECTAMENTE INDENTADA Y BLINDADA ANTI-ERRORES
+        # NUEVA ESTRUCTURA FLUIDA SIN BUCLES DE BOTONES COMPLEJOS
         if HAS_HISTORY:
             try:
                 past_chats = get_unique_sessions()
                 if past_chats:
-                    for chat in past_chats:
-                        button_key = f"btn_{chat['session_id']}"
-                        if st.button(f"💬 {chat['title']}", key=button_key, use_container_width=True):
+                    chat_options = {chat['title']: chat['session_id'] for chat in past_chats}
+                    selected_chat_title = st.selectbox(
+                        "Selecciona un chat previo:",
+                        options=list(chat_options.keys()),
