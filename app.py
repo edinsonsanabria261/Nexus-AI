@@ -90,7 +90,6 @@ def init_session_state():
         }]
     if "use_web_search" not in st.session_state:
         st.session_state.use_web_search = True
-    # Forzamos una variable temporal en memoria para mantener fijos los hilos al resetear la pantalla
     if "cached_history" not in st.session_state:
         st.session_state.cached_history = []
 
@@ -148,7 +147,7 @@ def generate_response(question):
             temperature=0.25,
             max_tokens=2500
         )
-        return res.choices.message.content
+        return res.choices[0].message.content
     except Exception as e:
         return f"Error en API de Groq: {e}"
 
@@ -171,7 +170,6 @@ def main():
         st.caption("Ciberseguridad avanzada")
         st.divider()
 
-        # Al hacer clic en "Nueva conversación", refrescamos la lista de la base de datos de inmediato antes del rerun
         if st.button("Nueva conversacion", use_container_width=True):
             if HAS_HISTORY:
                 try:
@@ -216,11 +214,10 @@ def main():
         st.markdown("**Conversaciones Recientes**")
         if HAS_HISTORY:
             try:
-                # Si la lista temporal en caché está vacía en este arranque, la alimentamos desde Supabase
+                # Si no hay caché, traemos las sesiones de Supabase de forma limpia
                 if not st.session_state.cached_history:
                     st.session_state.cached_history = get_unique_sessions()
                 
-                # Pintamos los botones usando la lista segura de la memoria de sesión
                 if st.session_state.cached_history:
                     for chat in st.session_state.cached_history:
                         b_key = f"sid_{chat['session_id']}"
@@ -270,3 +267,10 @@ def main():
             except Exception:
                 pass
 
+        with st.chat_message("assistant", avatar="🛡️"):
+            response = generate_response(prompt)
+            st.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+
+        if HAS_HISTORY:
+            try:
