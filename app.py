@@ -1,8 +1,6 @@
 import streamlit as st
 import uuid
 from groq import Groq
-from openai import OpenAI
-from anthropic import Anthropic
 from datetime import datetime
 import config
 from tools.web_search import search_and_read
@@ -47,7 +45,6 @@ st.markdown(
 )
 
 def init_session_state():
-    # Inicialización de identificadores únicos para hilos persistentes en Supabase
     if "current_session_id" not in st.session_state:
         st.session_state.current_session_id = str(uuid.uuid4())
     if "chat_title" not in st.session_state:
@@ -55,7 +52,7 @@ def init_session_state():
     if "messages" not in st.session_state:
         st.session_state.messages = [{
             "role": "assistant",
-            "content": f"Hola, soy **{config.BOT_NAME}** 🛡️\n\nEntorno táctico multi-modelo con historial persistente en Supabase.\n\nPuedes enseñarme con:\n`recuerda esto: [texto]`\n\n¿En qué puedo ayudarte?"
+            "content": f"Hola, soy **{config.BOT_NAME}** 🛡️\n\nEntorno táctico listo con historial persistente en Supabase.\n\n¿En qué puedo ayudarte?"
         }]
     if "use_web_search" not in st.session_state:
         st.session_state.use_web_search = True
@@ -65,7 +62,6 @@ def init_session_state():
 def generate_response(question, provider):
     q_lower = question.lower().strip()
     
-    # Procesar comando manual de aprendizaje externo
     if q_lower.startswith("recuerda esto:") or q_lower.startswith("recuerda esto :"):
         knowledge = question.split(":", 1)[1].strip()
         if knowledge:
@@ -75,13 +71,11 @@ def generate_response(question, provider):
             return "❌ Error al intentar conectar o guardar en Supabase."
         return "⚠️ Por favor, escribe información válida después del comando `recuerda esto:`"
 
-    # 1. Búsqueda semántica vectorizada (RAG)
     memory_hits = search_knowledge(question, limit=5)
     memory_text = ""
     if memory_hits:
         memory_text = "\n".join([f"- {m['content']}" for m in memory_hits])
 
-    # 2. Inteligencia web (OSINT)
     web_text = ""
     if st.session_state.use_web_search:
         with st.spinner("🔍 Rastreando fuentes web actualizadas..."):
@@ -90,7 +84,6 @@ def generate_response(question, provider):
             except Exception:
                 web_text = ""
 
-    # 3. Consolidación de Prompt Dinámico
     custom_system_prompt = config.SYSTEM_PROMPT
     if memory_text or web_text:
         custom_system_prompt += "\n\n[CONTEXTO EXTRACTO Y ACTUALIZADO DE TU ENTORNO]"
@@ -98,13 +91,13 @@ def generate_response(question, provider):
             custom_system_prompt += f"\n- Datos recuperados de tu memoria persistente (documentos/manuales):\n{memory_text}"
         if web_text:
             custom_system_prompt += f"\n- Inteligencia en tiempo real de internet:\n{web_text}"
-        custom_system_prompt += "\nUtiliza este contexto únicamente si guarda relación con la pregunta. Cita fuentes si aplica."
+        custom_system_prompt += "\nUtiliza este contexto únicamente si guarda relación con la pregunta."
 
-    # 4. Enrutamiento dinámico hacia API seleccionada
     try:
         if provider == "OpenAI (GPT-4o)":
             if not config.OPENAI_API_KEY:
                 return "❌ Error: Falta 'OPENAI_API_KEY' en tu panel de variables de Render para usar GPT-4o."
+            from openai import OpenAI  # Importación dinámica segura
             client = OpenAI(api_key=config.OPENAI_API_KEY)
             messages = [{"role": "system", "content": custom_system_prompt}]
             for msg in st.session_state.messages[-6:]:
@@ -117,6 +110,7 @@ def generate_response(question, provider):
         elif provider == "Anthropic (Claude 3.5 Sonnet)":
             if not config.ANTHROPIC_API_KEY:
                 return "❌ Error: Falta 'ANTHROPIC_API_KEY' en tu panel de variables de Render para usar Claude 3.5."
+            from anthropic import Anthropic  # Importación dinámica segura
             client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
             messages = []
             for msg in st.session_state.messages[-6:]:
@@ -170,7 +164,6 @@ def main():
         st.divider()
         st.session_state.use_web_search = st.toggle("🌐 Módulo OSINT / Web Search", value=st.session_state.use_web_search)
 
-        # COMPONENTE FASE B: Selector dinámico de motores LLM
         st.divider()
         st.markdown("### 🧠 Motor de Inteligencia (LLM)")
         provider_options = ["Groq (Llama 3)", "OpenAI (GPT-4o)", "Anthropic (Claude 3.5 Sonnet)"]
@@ -181,10 +174,8 @@ def main():
             label_visibility="collapsed"
         )
 
-        # COMPONENTE FASE A: Analizador Multiformato Expandido (PDF, Word, Excel, Código)
         st.divider()
         st.markdown("### 📁 Analizador Multimodal")
-        st.caption("Sube PDFs, Word (.docx), Excel (.xlsx), código o notas")
         uploaded_file = st.file_uploader(
             "Cargar archivo para indexar", 
             type=["pdf", "txt", "py", "js", "json", "md", "docx", "doc", "xlsx"],
@@ -197,12 +188,26 @@ def main():
                 with st.spinner(f"Indexando semánticamente {uploaded_file.name}..."):
                     file_bytes = uploaded_file.read()
                     chunks_saved = process_and_index_file(file_bytes, uploaded_file.name)
-                    
                     if chunks_saved > 0:
-                        st.success(f"✅ ¡{uploaded_file.name} procesado! {chunks_saved} bloques indexados.")
+                        st.success(f"✅ ¡Indexado exitoso!")
                         st.session_state.messages.append({
                             "role": "assistant",
-                            "content": f"⚙️ **Sistema:** El archivo `{uploaded_file.name}` ha sido fragmentado en {chunks_saved} bloques semánticos dentro de Supabase. Ya puedes consultarme sobre su contenido."
+                            "content": f"⚙️ **Sistema:** El archivo `{uploaded_file.name}` ha sido indexado con éxito ({chunks_saved} bloques)."
                         })
                     else:
-                        st.error("❌ No se pudo extraer texto. Verifica el formato o codificación.")
+                        st.error("❌ Archivo sin texto legible.")
+                st.session_state[file_key] = True
+
+        st.divider()
+        st.markdown("### 📜 Investigaciones Recientes")
+        past_chats = get_unique_sessions()
+        if past_chats:
+            for chat in past_chats:
+                button_key = f"btn_{chat['session_id']}"
+                if st.button(f"💬 {chat['title']}", key=button_key, use_container_width=True):
+                    st.session_state.current_session_id = chat['session_id']
+                    st.session_state.chat_title = chat['title']
+                    db_messages = load_session_messages(chat['session_id'])
+                    if db_messages:
+                        st.session_state.messages = db_messages
+                    st.rerun()
