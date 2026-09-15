@@ -6,7 +6,14 @@ import config
 from tools.web_search import search_and_read
 from tools.memory import save_knowledge, search_knowledge
 from tools.file_processor import process_and_index_file
-from tools.history_manager import save_chat_message, get_unique_sessions, load_session_messages
+
+# Intentamos importar el gestor de historial de forma segura
+try:
+    from tools.history_manager import save_chat_message, get_unique_sessions, load_session_messages
+    HAS_HISTORY = True
+except Exception as e:
+    HAS_HISTORY = False
+    print(f"[app] No se pudo cargar el gestor de historial: {e}")
 
 # Configuración de página limpia
 st.set_page_config(
@@ -16,7 +23,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Inyección estricta de CSS para evitar parpadeos y mantener el modo oscuro empresarial
+# Inyección estricta de CSS para forzar el modo oscuro empresarial desde el primer milisegundo
 st.markdown(
     """
     <style>
@@ -52,7 +59,7 @@ def init_session_state():
     if "messages" not in st.session_state:
         st.session_state.messages = [{
             "role": "assistant",
-            "content": f"Hola, soy **{config.BOT_NAME}** 🛡️\n\nEntorno táctico listo con historial persistente en Supabase.\n\n¿En qué puedo ayudarte?"
+            "content": f"Hola, soy **{config.BOT_NAME}** 🛡️\n\nEntorno táctico listo. Sistema a prueba de fallos activo.\n\n¿En qué puedo ayudarte?"
         }]
     if "use_web_search" not in st.session_state:
         st.session_state.use_web_search = True
@@ -63,7 +70,7 @@ def generate_response(question, provider):
     q_lower = question.lower().strip()
     
     if q_lower.startswith("recuerda esto:") or q_lower.startswith("recuerda esto :"):
-        knowledge = question.split(":", 1)[1].strip()
+        knowledge = question.split(":", 1).strip()
         if knowledge:
             ok = save_knowledge(knowledge, source="user", tags="manual")
             if ok:
@@ -105,7 +112,7 @@ def generate_response(question, provider):
                     messages.append({"role": msg["role"], "content": msg["content"]})
             messages.append({"role": "user", "content": question})
             res = client.chat.completions.create(model=config.MODEL_OPENAI, messages=messages, temperature=0.25)
-            return res.choices[0].message.content
+            return res.choices.message.content
 
         elif provider == "Anthropic (Claude 3.5 Sonnet)":
             if not config.ANTHROPIC_API_KEY:
@@ -118,7 +125,7 @@ def generate_response(question, provider):
                     messages.append({"role": msg["role"], "content": msg["content"]})
             messages.append({"role": "user", "content": question})
             res = client.messages.create(model=config.MODEL_ANTHROPIC, max_tokens=2500, temperature=0.25, system=custom_system_prompt, messages=messages)
-            return res.content[0].text
+            return res.content.text
 
         else:  # Groq por defecto
             if not config.GROQ_API_KEY:
@@ -130,7 +137,7 @@ def generate_response(question, provider):
                     messages.append({"role": msg["role"], "content": msg["content"]})
             messages.append({"role": "user", "content": question})
             res = client.chat.completions.create(model=config.MODEL_GROQ, messages=messages, temperature=0.25)
-            return res.choices[0].message.content
+            return res.choices.message.content
     except Exception as e:
         return f"❌ Error en la llamada al modelo ({provider}): {e}"
 
@@ -201,14 +208,11 @@ def main():
         st.divider()
         st.markdown("### 📜 Investigaciones Recientes")
         
-        # SINTAXIS SIMPLIFICADA Y LIMPIA DE HISTORIAL (Elimina el error de raíz)
-        past_chats = get_unique_sessions()
-        if past_chats:
-            for chat in past_chats:
-                button_key = f"btn_{chat['session_id']}"
-                if st.button(f"💬 {chat['title']}", key=button_key, use_container_width=True):
-                    st.session_state.current_session_id = chat['session_id']
-                    st.session_state.chat_title = chat['title']
-                    db_messages = load_session_messages(chat['session_id'])
-                    if db_messages:
-                        st.session_state.messages = db_messages
+        # SISTEMA DE DETECCIÓN Y EVITACIÓN DE BLOQUEOS (Si Supabase falla, la web carga igual)
+        if HAS_HISTORY:
+            try:
+                past_chats = get_unique_sessions()
+                if past_chats:
+                    for chat in past_chats:
+                        button_key = f"btn_{chat['session_id']}"
+                        if st.button(f"💬 {chat['title']}", key=button_key, use_container_width=True):
