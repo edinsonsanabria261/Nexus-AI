@@ -9,7 +9,7 @@ load_dotenv()
 
 # === API Keys ===
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL = "llama-3.1-70b-versatile"
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 # === Identidad del bot ===
 BOT_NAME = os.getenv("BOT_NAME", "NexusSec AI")
