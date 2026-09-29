@@ -3,11 +3,9 @@ name: Asistente Gemini en GitHub
 on:
   push:
     branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
 
 jobs:
-  analizar-codigo:
+  analizar-y-mejorar:
     runs-on: ubuntu-latest
     steps:
       - name: Copiar repositorio al entorno
@@ -18,11 +16,11 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Instalar dependencias necesarias
+      - name: Instalar dependencias
         run: |
-          pip install google-genai requests
+          pip install google-genai
 
-      - name: Ejecutar script de análisis con Gemini
+      - name: Hacer que Gemini lea tus archivos y los analice
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
@@ -32,12 +30,28 @@ jobs:
           
           client = genai.Client(api_key=os.environ['GEMINI_API_KEY'])
           
-          print('Iniciando análisis automatizado del repositorio...')
+          # Ejemplo: Leer un archivo de tu proyecto, por ejemplo 'app.py' o 'config.py'
+          archivo_a_revisar = 'config.py' if os.path.exists('config.py') else 'README.md'
+          
+          with open(archivo_a_revisar, 'r', encoding='utf-8') as f:
+              codigo = f.read()
+          
+          prompt = f'''
+          Actúa como un experto en ciberseguridad y desarrollo de software. 
+          Analiza el siguiente código de mi proyecto Nexus-AI ({archivo_a_revisar}):
+          
+          {codigo}
+          
+          Por favor, indícame:
+          1. Posibles errores de sintaxis o fallos de seguridad.
+          2. Sugerencias concretas para mejorarlo o acomodarlo.
+          '''
           
           response = client.models.generate_content(
               model='gemini-2.5-flash',
-              contents='Revisa las buenas prácticas generales de seguridad y estructura para un repositorio de proyectos tecnológicos.'
+              contents=prompt
           )
+          
+          print('=== REPORTE DE GEMINI PARA NEXUS-AI ===')
           print(response.text)
           "
-          
