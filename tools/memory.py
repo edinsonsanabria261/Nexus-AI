@@ -20,9 +20,13 @@ def get_supabase() -> Client | None:
 # === CONOCIMIENTO (Memoria a largo plazo) ===
 
 def save_knowledge(content: str, source: str = "user", tags: str = "") -> bool:
-    """Guarda conocimiento. Usa búsqueda de texto si no hay embeddings."""
+    """Guarda conocimiento. Muestra el error real si falla."""
     sb = get_supabase()
-    if not sb or not content.strip():
+    if not sb:
+        print("[memory] ERROR: No se pudo conectar a Supabase (URL o KEY vacías)")
+        return False
+    if not content.strip():
+        print("[memory] ERROR: content vacío")
         return False
     try:
         data = {
@@ -32,10 +36,11 @@ def save_knowledge(content: str, source: str = "user", tags: str = "") -> bool:
         if tags:
             data["tags"] = tags
 
-        sb.table("knowledge").insert(data).execute()
+        result = sb.table("knowledge").insert(data).execute()
+        print(f"[memory] Guardado OK: {result}")
         return True
     except Exception as e:
-        print(f"[memory] Error guardando knowledge: {e}")
+        print(f"[memory] ERROR REAL: {type(e).__name__}: {e}")
         return False
 
 
