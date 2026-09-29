@@ -5,6 +5,7 @@ from datetime import datetime
 import config
 from tools.web_search import search_and_read
 from tools.file_processor import process_and_index_file
+from tools.cyber_tools import detect_and_run_tool
 
 # Importamos las funciones unificadas directo desde tools.memory
 from tools.memory import save_knowledge, search_knowledge, save_chat_message, get_unique_sessions, load_session_messages
@@ -62,6 +63,11 @@ def init_session_state():
 def generate_response(question):
     if not config.GROQ_API_KEY:
         return "Falta GROQ_API_KEY en Render."
+
+        # === Herramientas de ciberseguridad ===
+    tool_result = detect_and_run_tool(question)
+    if tool_result:
+        return tool_result
     
     client = Groq(api_key=config.GROQ_API_KEY)
     q_lower = question.lower().strip()
