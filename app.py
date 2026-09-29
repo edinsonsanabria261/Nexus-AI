@@ -67,7 +67,7 @@ def generate_response(question):
     q_lower = question.lower().strip()
     
     if q_lower.startswith("recuerda esto:") or q_lower.startswith("recuerda esto :"):
-        knowledge = question.split(":", 1).strip()
+        knowledge = question.split(":", 1)[1].strip()
         if knowledge and save_knowledge(knowledge, source="user", tags="manual"):
             return f"Guardado en memoria persistente:\n\n> {knowledge}"
         return "Error al guardar en Supabase."
