@@ -1,0 +1,43 @@
+name: Asistente Gemini en GitHub
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  analizar-codigo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copiar repositorio al entorno
+        uses: actions/checkout@v4
+
+      - name: Configurar entorno de Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Instalar dependencias necesarias
+        run: |
+          pip install google-genai requests
+
+      - name: Ejecutar script de análisis con Gemini
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python -c "
+          import os
+          from google import genai
+          
+          client = genai.Client(api_key=os.environ['GEMINI_API_KEY'])
+          
+          print('Iniciando análisis automatizado del repositorio...')
+          
+          response = client.models.generate_content(
+              model='gemini-2.5-flash',
+              contents='Revisa las buenas prácticas generales de seguridad y estructura para un repositorio de proyectos tecnológicos.'
+          )
+          print(response.text)
+          "
+          
