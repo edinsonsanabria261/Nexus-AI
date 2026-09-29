@@ -12,32 +12,40 @@ TIMEOUT = 8
 
 
 def tool_cve(cve_id: str) -> str:
-    """Busca información de un CVE."""
+    """Busca información de un CVE (fuente alternativa)."""
     cve_id = cve_id.strip().upper()
     if not cve_id.startswith("CVE-"):
         cve_id = f"CVE-{cve_id}"
 
     try:
-        # API pública de CIRCL
+        # Fuente alternativa más estable
         url = f"https://cve.circl.lu/api/cve/{cve_id}"
-        r = requests.get(url, timeout=TIMEOUT)
-        if r.status_code != 200:
-            return f"No se encontró información para **{cve_id}**."
+        r = requests.get(url, timeout=10)
+        
+        if r.status_code == 200:
+            data = r.json()
+            summary = data.get("summary", "Sin descripción")
+            cvss = data.get("cvss") or data.get("cvss3") or "N/A"
+            published = str(data.get("Published", data.get("published", "N/A")))[:10]
+            refs = data.get("references", [])[:3]
+            refs_text = "\n".join([f"- {ref}" for ref in refs]) if refs else "Sin referencias"
 
-        data = r.json()
-        summary = data.get("summary") or data.get("descriptions", [{}])[0].get("value", "Sin descripción")
-        cvss = data.get("cvss") or data.get("cvss3", "N/A")
-        published = data.get("Published") or data.get("published", "N/A")
-        references = data.get("references", [])[:3]
-
-        refs_text = "\n".join([f"- {ref}" for ref in references]) if references else "Sin referencias"
-
+            if summary and summary != "Sin descripción":
+                return (
+                    f"### {cve_id}\n\n"
+                    f"**Resumen:** {summary}\n\n"
+                    f"**CVSS:** {cvss}\n"
+                    f"**Publicado:** {published}\n\n"
+                    f"**Referencias:**\n{refs_text}"
+                )
+        
+        # Si falla, mensaje claro
         return (
             f"### {cve_id}\n\n"
-            f"**Resumen:** {summary}\n\n"
-            f"**CVSS:** {cvss}\n"
-            f"**Publicado:** {published}\n\n"
-            f"**Referencias:**\n{refs_text}"
+            f"No pude obtener detalles desde las APIs públicas en este momento.\n"
+            f"Puedes consultarlo manualmente en:\n"
+            f"- https://nvd.nist.gov/vuln/detail/{cve_id}\n"
+            f"- https://cve.mitre.org/cgi-bin/cvename.cgi?name={cve_id}"
         )
     except Exception as e:
         return f"Error al consultar CVE: {e}"
