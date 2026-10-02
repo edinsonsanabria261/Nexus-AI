@@ -5,7 +5,7 @@ on:
     branches: [ "main", "master" ]
 
 jobs:
-  analizar-y-mejorar:
+  arreglar-interfaz:
     runs-on: ubuntu-latest
     steps:
       - name: Copiar repositorio al entorno
@@ -20,7 +20,7 @@ jobs:
         run: |
           pip install google-genai
 
-      - name: Hacer que Gemini lea tus archivos y los analice
+      - name: Analizar archivos web y corregir con Gemini
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
@@ -30,21 +30,25 @@ jobs:
           
           client = genai.Client(api_key=os.environ['GEMINI_API_KEY'])
           
-          # Ejemplo: Leer un archivo de tu proyecto, por ejemplo 'app.py' o 'config.py'
-          archivo_a_revisar = 'config.py' if os.path.exists('config.py') else 'README.md'
+          # Buscamos archivos comunes de tu proyecto web
+          archivos_a_buscar = ['app.py', 'main.py', 'index.html', 'script.js']
+          contenido_total = ''
           
-          with open(archivo_a_revisar, 'r', encoding='utf-8') as f:
-              codigo = f.read()
+          for archivo in archivos_a_buscar:
+              if os.path.exists(archivo):
+                  with open(archivo, 'r', encoding='utf-8') as f:
+                      contenido_total += f'\n\n--- ARCHIVO: {archivo} ---\n' + f.read()
           
           prompt = f'''
-          Actúa como un experto en ciberseguridad y desarrollo de software. 
-          Analiza el siguiente código de mi proyecto Nexus-AI ({archivo_a_revisar}):
+          Actúa como un desarrollador experto en frontend y Supabase. 
+          En mi interfaz web alojada en Render tengo este error en el navegador: 
+          'NotFoundError: Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.' 
+          Esto pasa al hacer clic en 'Nueva conversación' o limpiar el DOM.
           
-          {codigo}
+          Aquí está el código actual de mi proyecto:
+          {contenido_total}
           
-          Por favor, indícame:
-          1. Posibles errores de sintaxis o fallos de seguridad.
-          2. Sugerencias concretas para mejorarlo o acomodarlo.
+          Por favor, dime exactamente qué líneas debo modificar y dame el código corregido en JavaScript o Python para solucionar este error de DOM y hacer que el botón de nueva conversación funcione de manera fluida con Supabase.
           '''
           
           response = client.models.generate_content(
@@ -52,6 +56,6 @@ jobs:
               contents=prompt
           )
           
-          print('=== REPORTE DE GEMINI PARA NEXUS-AI ===')
+          print('=== SOLUCIÓN GENERADA POR GEMINI PARA TU WEB ===')
           print(response.text)
           "
