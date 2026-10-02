@@ -124,25 +124,6 @@ def main():
             <h1>{config.BOT_NAME}</h1>
             <p>Inteligencia Artificial de Ciberseguridad</p>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    with st.sidebar:
-        st.markdown(f"### {config.BOT_NAME}")
-        st.caption("Ciberseguridad avanzada")
-        st.divider()
-
-        if st.button("Nueva conversacion", use_container_width=True):
-            try:
-                st.session_state.cached_history = get_unique_sessions()
-            except Exception:
-                pass
-            st.session_state.current_session_id = str(uuid.uuid4())
-            st.session_state.chat_title = "Nueva conversación"
-            st.session_state.messages = [{
-                "role": "assistant",
-                "content": "Nueva conversacion iniciada. ¿En que puedo ayudarte?"
-            }]
             st.rerun()
 
         st.divider()
@@ -200,10 +181,16 @@ def main():
         st.caption(f"v0.6 · {datetime.now().strftime('%Y-%m-%d')}")
         st.caption(f"Creado por {config.OWNER_NAME}")
 
-            for i, msg in enumerate(st.session_state.messages):
-        avatar = "🛡️" if msg["role"] == "assistant" else "👤"
-        with st.chat_message(msg["role"], avatar=avatar, key=f"msg_{st.session_state.current_session_id}_{i}"):
-            st.markdown(msg["content"])
+    # === INICIO DE LA MODIFICACIÓN ===
+    # Placeholder para los mensajes del chat, ayuda a Streamlit a gestionar las actualizaciones del DOM
+    chat_display_area = st.empty() 
+
+    with chat_display_area.container():
+        for i, msg in enumerate(st.session_state.messages):
+            avatar = "🛡️" if msg["role"] == "assistant" else "👤"
+            with st.chat_message(msg["role"], avatar=avatar, key=f"msg_{st.session_state.current_session_id}_{i}"):
+                st.markdown(msg["content"])
+    # === FIN DE LA MODIFICACIÓN ===
 
     if prompt := st.chat_input(f"Pregunta a {config.BOT_NAME}..."):
         if len(st.session_state.messages) <= 1:
