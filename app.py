@@ -200,9 +200,8 @@ def main():
         st.caption(f"v0.6 · {datetime.now().strftime('%Y-%m-%d')}")
         st.caption(f"Creado por {config.OWNER_NAME}")
 
-        for i, msg in enumerate(st.session_state.messages):
+            for i, msg in enumerate(st.session_state.messages):
         avatar = "🛡️" if msg["role"] == "assistant" else "👤"
-        # Agregamos una key única combinando la sesión y el índice del mensaje
         with st.chat_message(msg["role"], avatar=avatar, key=f"msg_{st.session_state.current_session_id}_{i}"):
             st.markdown(msg["content"])
 
