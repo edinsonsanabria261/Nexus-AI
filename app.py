@@ -15,7 +15,7 @@ from ui.theme import inject_theme
 def main() -> None:
     st.set_page_config(
         page_title=config.BOT_NAME,
-        page_icon="N",
+        page_icon="🛡️",
         layout="wide",
         initial_sidebar_state="expanded",
     )
@@ -44,7 +44,7 @@ def main() -> None:
         st.session_state.chat_title = prompt[:40]
 
     st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user", avatar="U"):
+    with st.chat_message("user", avatar="👤"):
         st.markdown(prompt)
 
     try:
@@ -57,7 +57,7 @@ def main() -> None:
     except Exception:
         pass
 
-    with st.chat_message("assistant", avatar="N"):
+    with st.chat_message("assistant", avatar="🛡️"):
         with st.spinner("Consultando..."):
             response = generate_response(
                 prompt,
