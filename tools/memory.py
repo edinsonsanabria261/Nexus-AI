@@ -1,4 +1,4 @@
-"""Memoria de conocimiento en Supabase (manual + auto-aprendizaje)."""
+"""Memoria de conocimiento en Supabase (auto-aprendizaje)."""
 
 import os
 import re
@@ -11,20 +11,6 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
-# Palabras que indican contenido útil de ciberseguridad para auto-guardar
-CYBER_HINTS = (
-    "cve", "exploit", "payload", "malware", "ransomware", "phishing",
-    "pentest", "vulnerability", "vulnerabilidad", "buffer", "overflow",
-    "sql injection", "xss", "rce", "lfi", "ssrf", "kerberos", "ntlm",
-    "active directory", "privilege", "escalation", "lateral",
-    "reverse shell", "bind shell", "nmap", "wireshark", "metasploit",
-    "forense", "forensic", "hash", "encryption", "cifrado",
-    "firewall", "ids", "ips", "zero-day", "0day", "bypass",
-    "authentication", "autenticación", "oauth", "jwt", "api key",
-    "docker", "kubernetes", "cloud", "aws", "azure", "linux",
-    "windows", "powershell", "bash", "python", "shellcode",
-)
-
 
 def get_supabase() -> Client | None:
     if not SUPABASE_URL or not SUPABASE_KEY:
@@ -35,7 +21,7 @@ def get_supabase() -> Client | None:
         return None
 
 
-def save_knowledge(content: str, source: str = "user", tags: str = "") -> bool:
+def save_knowledge(content: str, source: str = "auto", tags: str = "") -> bool:
     client = get_supabase()
     if not client:
         print("[memory] Sin conexión a Supabase")
@@ -78,7 +64,6 @@ def search_knowledge(query: str, limit: int = 6) -> list:
     if hits:
         return hits
 
-    # Fallback: palabras significativas (>= 4 chars)
     words = re.findall(r"[\wáéíóúñü-]{4,}", query.lower())
     seen = set()
     merged = []
@@ -93,30 +78,20 @@ def search_knowledge(query: str, limit: int = 6) -> list:
     return merged
 
 
-def looks_cyber_related(text: str) -> bool:
-    lower = (text or "").lower()
-    return any(h in lower for h in CYBER_HINTS)
-
-
 def auto_learn(question: str, answer: str) -> bool:
     """
-    Guarda automáticamente un par pregunta/respuesta si parece útil en ciberseguridad.
-    No bloquea el chat si falla.
+    Guarda automáticamente cada intercambio útil.
+    Sin comandos del usuario. Si falla, no rompe el chat.
     """
     if not question or not answer:
         return False
-    if len(answer) < 80:
+    if len(answer) < 40:
         return False
-    if answer.startswith("Error") or answer.startswith("No se pudo"):
-        return False
-
-    combined = f"{question}\n{answer}"
-    if not looks_cyber_related(combined):
+    if answer.startswith("Error") or answer.startswith("Falta GROQ"):
         return False
 
-    # Resumen compacto para no llenar la tabla de ruido
     snippet = (
         f"P: {question.strip()[:300]}\n"
         f"R: {answer.strip()[:1500]}"
     )
-    return save_knowledge(snippet, source="auto", tags="auto,ciber")
+    return save_knowledge(snippet, source="auto", tags="auto")
