@@ -1,4 +1,4 @@
-"""Barra lateral: modo, historial y archivos."""
+"""Barra lateral estilo lista de conversaciones (tipo Grok)."""
 
 from datetime import datetime
 
@@ -13,10 +13,20 @@ from tools.history_manager import (
     load_session_messages,
     rename_session,
 )
+from tools.memory import get_supabase
 
 
 def render_sidebar() -> None:
     with st.sidebar:
+        # --- Nueva conversación (arriba, como Grok) ---
+        if st.button("✎  Nueva conversación", use_container_width=True, type="primary"):
+            st.session_state.cached_history = get_unique_sessions()
+            start_new_chat()
+            st.rerun()
+
+        st.divider()
+
+        # --- Modo IA ---
         st.markdown("**Modo IA**")
         labels = [mode["label"] for mode in MODES]
         ids = [mode["id"] for mode in MODES]
@@ -29,22 +39,12 @@ def render_sidebar() -> None:
             label_visibility="collapsed",
         )
         st.session_state.ia_mode = ids[labels.index(chosen)]
-        blurb = next(mode["blurb"] for mode in MODES if mode["label"] == chosen)
-        st.caption(blurb)
-
-        st.divider()
-        if st.button("Nueva conversación", use_container_width=True):
-            # Refresca lista antes de cambiar para no perder el historial en pantalla
-            st.session_state.cached_history = get_unique_sessions()
-            start_new_chat()
-            st.rerun()
 
         st.divider()
         st.session_state.use_web_search = st.toggle(
-            "Resultados rápidos de la Web",
+            "Buscar en la web",
             value=st.session_state.use_web_search,
         )
-        st.caption("En Todo, la web es opcional. En los otros modos siempre se consulta.")
 
         st.divider()
         st.markdown("**Documentos**")
@@ -60,80 +60,88 @@ def render_sidebar() -> None:
                     saved = process_and_index_file(uploaded.read(), uploaded.name)
                 st.session_state[file_key] = True
                 if saved > 0:
-                    st.success(f"{uploaded.name}: {saved} bloques guardados.")
-                    st.session_state.messages.append(
-                        {
-                            "role": "assistant",
-                            "content": (
-                                f"El archivo `{uploaded.name}` quedó indexado "
-                                f"({saved} bloques)."
-                            ),
-                        }
-                    )
+                    st.success(f"{uploaded.name}: {saved} bloques.")
                 else:
-                    st.error("No se pudo extraer texto o guardarlo en la memoria.")
+                    st.error("No se pudo indexar el archivo.")
 
         st.divider()
+
+        # --- Conversaciones (estilo lista Grok) ---
         st.markdown("**Conversaciones**")
 
-        # Siempre recargar desde Supabase para que no desaparezcan
-        try:
-            st.session_state.cached_history = get_unique_sessions()
-        except Exception:
-            if "cached_history" not in st.session_state:
-                st.session_state.cached_history = []
+        sb = get_supabase()
+        if not sb:
+            st.warning(
+                "Historial desconectado. Revisa SUPABASE_URL y SUPABASE_KEY en Render."
+            )
+            history = []
+        else:
+            try:
+                history = get_unique_sessions(limit=50)
+                st.session_state.cached_history = history
+            except Exception as exc:
+                st.warning(f"No se pudo cargar el historial: {exc}")
+                history = st.session_state.get("cached_history") or []
 
-        # Renombrar conversación actual
-        with st.expander("Renombrar conversación actual", expanded=False):
+        # Renombrar actual
+        with st.expander("Renombrar actual", expanded=False):
             new_name = st.text_input(
-                "Nuevo nombre",
+                "Nombre",
                 value=st.session_state.get("chat_title") or "",
                 key="rename_input",
                 label_visibility="collapsed",
-                placeholder="Nombre de la conversación",
+                placeholder="Nuevo nombre",
             )
-            if st.button("Guardar nombre", use_container_width=True):
+            if st.button("Guardar nombre", use_container_width=True, key="btn_rename"):
                 if new_name and new_name.strip():
-                    ok = rename_session(
+                    if rename_session(
                         st.session_state.current_session_id, new_name.strip()
-                    )
-                    if ok:
+                    ):
                         st.session_state.chat_title = new_name.strip()[:80]
                         st.session_state.cached_history = get_unique_sessions()
-                        st.success("Nombre actualizado")
                         st.rerun()
                     else:
-                        st.error("No se pudo renombrar. Revisa Supabase.")
+                        st.error("No se pudo renombrar.")
 
-        try:
-            history = st.session_state.cached_history or []
-            if history:
-                for chat in history:
-                    sid = chat["session_id"]
-                    label = chat.get("title") or "Sin título"
-                    is_current = sid == st.session_state.current_session_id
-                    prefix = "▸ " if is_current else ""
-                    if st.button(
-                        f"{prefix}{label}",
-                        key=f"sid_{sid}",
-                        use_container_width=True,
-                    ):
-                        st.session_state.current_session_id = sid
-                        st.session_state.chat_title = label
-                        loaded = load_session_messages(sid)
-                        if loaded:
-                            st.session_state.messages = loaded
-                        st.rerun()
-            else:
+        if history:
+            show_all = st.session_state.get("show_all_chats", False)
+            visible = history if show_all else history[:8]
+
+            for chat in visible:
+                sid = chat["session_id"]
+                label = (chat.get("title") or "Sin título")[:48]
+                is_current = sid == st.session_state.current_session_id
+                btn_label = f"▸ {label}" if is_current else label
+
+                if st.button(
+                    btn_label,
+                    key=f"sid_{sid}",
+                    use_container_width=True,
+                    type="primary" if is_current else "secondary",
+                ):
+                    st.session_state.current_session_id = sid
+                    st.session_state.chat_title = label
+                    loaded = load_session_messages(sid)
+                    if loaded:
+                        st.session_state.messages = loaded
+                    st.rerun()
+
+            if len(history) > 8:
+                if st.button(
+                    "Ver todas" if not show_all else "Ver menos",
+                    use_container_width=True,
+                    key="toggle_all_chats",
+                ):
+                    st.session_state.show_all_chats = not show_all
+                    st.rerun()
+        else:
+            if sb:
                 st.caption(
-                    "Aún no hay conversaciones guardadas. "
-                    "Escribe un mensaje para crear la primera."
+                    "Aún no hay conversaciones. Escribe un mensaje y se guardará aquí."
                 )
-        except Exception:
-            st.caption("Historial no disponible. Revisa Supabase.")
 
         st.divider()
         st.markdown("**Modelo**")
         st.code(config.GROQ_MODEL, language=None)
-        st.caption(f"v0.7 · {datetime.now().strftime('%d/%m/%Y')}")
+        st.caption(f"v0.8 · {datetime.now().strftime('%d/%m/%Y')}")
         st.caption(f"Creado por {config.OWNER_NAME}")
