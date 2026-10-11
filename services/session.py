@@ -10,10 +10,9 @@ def welcome_message() -> dict:
         "role": "assistant",
         "content": (
             f"Hola, soy **{config.BOT_NAME}**.\n\n"
-            "Puedo ayudarte con preguntas generales y con ciberseguridad defensiva. "
-            "Arriba, en Modo IA, elige Todo, Imágenes, Videos, Noticias, Libros o Finanzas.\n\n"
-            "Para guardar una nota: `recuerda esto: [texto]`.\n\n"
-            "Consultas rápidas: `cve`, `whois`, `dns`, `ip`, `headers` y `hash`."
+            "Asistente de ciberseguridad avanzada. "
+            "Recuerdo automáticamente lo que hablamos y lo uso en preguntas futuras.\n\n"
+            "Consultas rápidas: `cve`, `whois`, `dns`, `ip`, `headers`, `hash`."
         ),
     }
 
