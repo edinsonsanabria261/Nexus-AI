@@ -1,7 +1,9 @@
 """Estado de la conversación en Streamlit."""
 
 import uuid
+
 import streamlit as st
+
 import config
 
 
@@ -11,7 +13,9 @@ def welcome_message() -> dict:
         "content": (
             f"Hola, soy **{config.BOT_NAME}**.\n\n"
             "Asistente de ciberseguridad avanzada. "
-            "Recuerdo automáticamente lo que hablamos y lo uso en preguntas futuras.\n\n"
+            "Recuerdo automáticamente lo que hablamos.\n\n"
+            "Tus conversaciones se guardan en el panel izquierdo. "
+            "Puedes abrirlas cuando quieras o renombrarlas.\n\n"
             "Consultas rápidas: `cve`, `whois`, `dns`, `ip`, `headers`, `hash`."
         ),
     }
@@ -33,6 +37,8 @@ def init_session_state() -> None:
 
 
 def start_new_chat() -> None:
+    """Inicia un hilo nuevo. No borra las conversaciones anteriores."""
     st.session_state.current_session_id = str(uuid.uuid4())
     st.session_state.chat_title = "Nueva conversación"
     st.session_state.messages = [welcome_message()]
+    # cached_history se refresca en el sidebar desde Supabase
