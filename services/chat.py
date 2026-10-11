@@ -3,7 +3,7 @@
 import config
 from services.modes import MODE_HINTS, normalize_mode
 from tools.cyber_tools import detect_and_run_tool
-from tools.memory import auto_learn, save_knowledge, search_knowledge
+from tools.memory import auto_learn, search_knowledge
 from tools.web_search import gather
 
 
@@ -19,18 +19,10 @@ def generate_response(question: str, history: list, use_web: bool, mode: str) ->
             pass
         return tool_result
 
-    # 2) Comando manual de memoria
-    lowered = question.lower().strip()
-    if lowered.startswith("recuerda esto:") or lowered.startswith("recuerda esto :"):
-        knowledge = question.split(":", 1)[1].strip()
-        if knowledge and save_knowledge(knowledge, source="user", tags="manual"):
-            return f"Guardado en la memoria:\n\n> {knowledge}"
-        return "No se pudo guardar. Revisa SUPABASE_URL y SUPABASE_KEY."
-
     if not config.GROQ_API_KEY:
         return "Falta GROQ_API_KEY en el entorno."
 
-    # 3) Memoria a largo plazo (cada pregunta)
+    # 2) Memoria a largo plazo (automática, cada pregunta)
     memory_hits = search_knowledge(question, limit=6)
     memory_text = ""
     if memory_hits:
@@ -38,7 +30,7 @@ def generate_response(question: str, history: list, use_web: bool, mode: str) ->
             f"- {item['content']}" for item in memory_hits if item.get("content")
         )
 
-    # 4) Web
+    # 3) Web
     web_context = ""
     web_preview = ""
     if use_web or mode != "todo":
@@ -53,7 +45,7 @@ def generate_response(question: str, history: list, use_web: bool, mode: str) ->
             web_context = ""
             web_preview = ""
 
-    # 5) Contexto de conversación (más mensajes = mejor recuerdo en sesión)
+    # 4) Contexto de conversación
     messages = [{"role": "system", "content": config.SYSTEM_PROMPT}]
     for msg in history[-10:]:
         if msg.get("role") in ("user", "assistant") and msg.get("content"):
@@ -70,7 +62,7 @@ def generate_response(question: str, history: list, use_web: bool, mode: str) ->
 
     messages.append({"role": "user", "content": f"{question}{extra}"})
 
-    # 6) Modelo
+    # 5) Modelo
     try:
         from groq import Groq
 
@@ -85,7 +77,7 @@ def generate_response(question: str, history: list, use_web: bool, mode: str) ->
     except Exception as exc:
         return f"Error en la API de Groq: {exc}"
 
-    # 7) Auto-aprendizaje (no bloquea si falla)
+    # 6) Auto-aprendizaje silencioso (sin comandos del usuario)
     try:
         auto_learn(question, answer)
     except Exception as exc:
