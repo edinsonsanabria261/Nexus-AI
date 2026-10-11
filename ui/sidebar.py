@@ -8,7 +8,11 @@ import config
 from services.modes import MODES
 from services.session import start_new_chat
 from tools.file_processor import process_and_index_file
-from tools.history_manager import get_unique_sessions, load_session_messages
+from tools.history_manager import (
+    get_unique_sessions,
+    load_session_messages,
+    rename_session,
+)
 
 
 def render_sidebar() -> None:
@@ -30,6 +34,8 @@ def render_sidebar() -> None:
 
         st.divider()
         if st.button("Nueva conversación", use_container_width=True):
+            # Refresca lista antes de cambiar para no perder el historial en pantalla
+            st.session_state.cached_history = get_unique_sessions()
             start_new_chat()
             st.rerun()
 
@@ -69,30 +75,65 @@ def render_sidebar() -> None:
 
         st.divider()
         st.markdown("**Conversaciones**")
+
+        # Siempre recargar desde Supabase para que no desaparezcan
         try:
-            if not st.session_state.cached_history:
-                st.session_state.cached_history = get_unique_sessions()
-            if st.session_state.cached_history:
-                for chat in st.session_state.cached_history:
+            st.session_state.cached_history = get_unique_sessions()
+        except Exception:
+            if "cached_history" not in st.session_state:
+                st.session_state.cached_history = []
+
+        # Renombrar conversación actual
+        with st.expander("Renombrar conversación actual", expanded=False):
+            new_name = st.text_input(
+                "Nuevo nombre",
+                value=st.session_state.get("chat_title") or "",
+                key="rename_input",
+                label_visibility="collapsed",
+                placeholder="Nombre de la conversación",
+            )
+            if st.button("Guardar nombre", use_container_width=True):
+                if new_name and new_name.strip():
+                    ok = rename_session(
+                        st.session_state.current_session_id, new_name.strip()
+                    )
+                    if ok:
+                        st.session_state.chat_title = new_name.strip()[:80]
+                        st.session_state.cached_history = get_unique_sessions()
+                        st.success("Nombre actualizado")
+                        st.rerun()
+                    else:
+                        st.error("No se pudo renombrar. Revisa Supabase.")
+
+        try:
+            history = st.session_state.cached_history or []
+            if history:
+                for chat in history:
+                    sid = chat["session_id"]
                     label = chat.get("title") or "Sin título"
+                    is_current = sid == st.session_state.current_session_id
+                    prefix = "▸ " if is_current else ""
                     if st.button(
-                        label,
-                        key=f"sid_{chat['session_id']}",
+                        f"{prefix}{label}",
+                        key=f"sid_{sid}",
                         use_container_width=True,
                     ):
-                        st.session_state.current_session_id = chat["session_id"]
+                        st.session_state.current_session_id = sid
                         st.session_state.chat_title = label
-                        loaded = load_session_messages(chat["session_id"])
+                        loaded = load_session_messages(sid)
                         if loaded:
                             st.session_state.messages = loaded
                         st.rerun()
             else:
-                st.caption("Todavía no hay conversaciones guardadas.")
+                st.caption(
+                    "Aún no hay conversaciones guardadas. "
+                    "Escribe un mensaje para crear la primera."
+                )
         except Exception:
             st.caption("Historial no disponible. Revisa Supabase.")
 
         st.divider()
         st.markdown("**Modelo**")
         st.code(config.GROQ_MODEL, language=None)
-        st.caption(f"v0.7 · {datetime.now().strftime('%Y-%m-%d')}")
+        st.caption(f"v0.7 · {datetime.now().strftime('%d/%m/%Y')}")
         st.caption(f"Creado por {config.OWNER_NAME}")
