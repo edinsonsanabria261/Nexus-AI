@@ -1,12 +1,15 @@
-"""
-Memoria persistente semántica e historial unificados para NexusSec AI
-"""
+"""Memoria de conocimiento en Supabase."""
 
 import os
-from supabase import create_client, Client
+
+from dotenv import load_dotenv
+from supabase import Client, create_client
+
+load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+
 
 def get_supabase() -> Client | None:
     if not SUPABASE_URL or not SUPABASE_KEY:
@@ -17,42 +20,48 @@ def get_supabase() -> Client | None:
         return None
 
 
-# === CONOCIMIENTO (Memoria a largo plazo) ===
+def obtener_embedding_externo(text: str):
+    """Embedding opcional. Sin OPENAI_API_KEY devuelve None y el texto igual se guarda."""
+    key = os.getenv("OPENAI_API_KEY", "")
+    if not key or not text or not text.strip():
+        return None
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=key)
+        model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+        result = client.embeddings.create(model=model, input=text[:8000])
+        return result.data[0].embedding
+    except Exception as exc:
+        print(f"[memory] Embedding no disponible: {exc}")
+        return None
+
 
 def save_knowledge(content: str, source: str = "user", tags: str = "") -> bool:
-    """Guarda conocimiento. Muestra el error real si falla."""
-    sb = get_supabase()
-    if not sb:
-        print("[memory] ERROR: No se pudo conectar a Supabase (URL o KEY vacías)")
+    client = get_supabase()
+    if not client:
+        print("[memory] Sin conexión a Supabase")
         return False
     if not content.strip():
-        print("[memory] ERROR: content vacío")
         return False
+    data = {"content": content.strip(), "source": source}
+    if tags:
+        data["tags"] = tags
     try:
-        data = {
-            "content": content.strip(),
-            "source": source,
-        }
-        if tags:
-            data["tags"] = tags
-
-        result = sb.table("knowledge").insert(data).execute()
-        print(f"[memory] Guardado OK: {result}")
+        client.table("knowledge").insert(data).execute()
         return True
-    except Exception as e:
-        print(f"[memory] ERROR REAL: {type(e).__name__}: {e}")
+    except Exception as exc:
+        print(f"[memory] Error al guardar: {type(exc).__name__}: {exc}")
         return False
 
 
 def search_knowledge(query: str, limit: int = 4) -> list:
-    """Busca conocimiento por texto (robusto y compatible)."""
-    sb = get_supabase()
-    if not sb or not query.strip():
+    client = get_supabase()
+    if not client or not query.strip():
         return []
     try:
-        # Búsqueda simple y confiable por ahora
         response = (
-            sb.table("knowledge")
+            client.table("knowledge")
             .select("content, source, created_at")
             .ilike("content", f"%{query}%")
             .order("created_at", desc=True)
@@ -60,64 +69,6 @@ def search_knowledge(query: str, limit: int = 4) -> list:
             .execute()
         )
         return response.data or []
-    except Exception as e:
-        print(f"[memory] Error buscando knowledge: {e}")
-        return []
-
-
-# === HISTORIAL DE CHATS ===
-
-def save_chat_message(session_id: str, title: str, role: str, content: str):
-    sb = get_supabase()
-    if not sb or not content or not content.strip():
-        return
-    try:
-        data = {
-            "session_id": str(session_id),
-            "title": str(title)[:40],
-            "role": str(role),
-            "content": str(content)
-        }
-        sb.table("chat_history").insert(data).execute()
-    except Exception as e:
-        print(f"[memory_history] Error: {e}")
-
-
-def get_unique_sessions():
-    sb = get_supabase()
-    if not sb:
-        return []
-    try:
-        response = (
-            sb.table("chat_history")
-            .select("session_id, title, created_at")
-            .order("created_at", desc=True)
-            .execute()
-        )
-        seen = set()
-        unique_chats = []
-        for row in (response.data or []):
-            sid = row.get("session_id")
-            if sid and sid not in seen:
-                seen.add(sid)
-                unique_chats.append(row)
-        return unique_chats
-    except Exception:
-        return []
-
-
-def load_session_messages(session_id: str):
-    sb = get_supabase()
-    if not sb:
-        return []
-    try:
-        response = (
-            sb.table("chat_history")
-            .select("role, content")
-            .eq("session_id", str(session_id))
-            .order("created_at", desc=False)
-            .execute()
-        )
-        return response.data or []
-    except Exception:
+    except Exception as exc:
+        print(f"[memory] Error al buscar: {exc}")
         return []

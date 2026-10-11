@@ -1,117 +1,106 @@
-"""
-Módulo universal de extracción y segmentación de archivos (PDF, DOCX, XLSX, Código, Texto) para Nexus-AI
-"""
+"""Extracción de texto e indexación de archivos en la memoria."""
 
 import io
-from pypdf import PdfReader
+
 import docx2txt
 import openpyxl
+from pypdf import PdfReader
+
+import tools.memory as memory_module
+
+
+def _extract(file_contents: bytes, filename: str) -> list:
+    stream = io.BytesIO(file_contents)
+    name = filename.lower()
+    pages = []
+
+    if name.endswith(".pdf"):
+        reader = PdfReader(stream)
+        for number, page in enumerate(reader.pages, start=1):
+            text = page.extract_text() or ""
+            if text.strip():
+                pages.append((text, number))
+        return pages
+
+    if name.endswith(".docx") or name.endswith(".doc"):
+        text = docx2txt.process(stream) or ""
+        return [(text, 1)] if text.strip() else []
+
+    if name.endswith(".xlsx"):
+        workbook = openpyxl.load_workbook(stream, data_only=True)
+        parts = []
+        for sheet_name in workbook.sheetnames:
+            parts.append(f"--- Hoja: {sheet_name} ---")
+            for row in workbook[sheet_name].iter_rows(values_only=True):
+                line = "\t".join(str(cell) for cell in row if cell is not None)
+                if line.strip():
+                    parts.append(line)
+        text = "\n".join(parts)
+        return [(text, 1)] if text.strip() else []
+
+    text = ""
+    for encoding in ("utf-8", "latin-1", "iso-8859-15", "cp1252"):
+        try:
+            text = file_contents.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    if not text:
+        text = file_contents.decode("utf-8", errors="ignore")
+    return [(text, 1)] if text.strip() else []
+
+
+def _insert_chunk(client, content: str, filename: str, page_num: int) -> bool:
+    embedding = memory_module.obtener_embedding_externo(content)
+    full = {
+        "content": content,
+        "source": "file_upload",
+        "tags": f"file_upload:{filename}",
+        "filename": filename,
+        "page_number": int(page_num),
+    }
+    if embedding:
+        full["embedding"] = embedding
+    minimal = {
+        "content": content,
+        "source": "file_upload",
+        "tags": f"file_upload:{filename}",
+    }
+    last_error = None
+    for payload in (full, minimal):
+        try:
+            client.table("knowledge").insert(payload).execute()
+            return True
+        except Exception as exc:
+            last_error = exc
+    print(f"[file_processor] No se pudo guardar un bloque: {last_error}")
+    return False
+
 
 def process_and_index_file(file_contents: bytes, filename: str) -> int:
-    """
-    Procesa un archivo binario de CUALQUIER formato común (PDF, Word, Excel, Código), 
-    extrae su texto y lo indexa semánticamente en Supabase usando la API externa de embeddings.
-    """
-    file_bytes_stream = io.BytesIO(file_contents)
-    text_by_page = []
-    fn_lower = filename.lower()
-    
-    # 1. EXTRACTOR MULTIFORMATO INTELIGENTE
-    if fn_lower.endswith('.pdf'):
-        try:
-            reader = PdfReader(file_bytes_stream)
-            for page_num, page in enumerate(reader.pages, start=1):
-                page_text = page.extract_text()
-                if page_text and page_text.strip():
-                    text_by_page.append((page_text, page_num))
-        except Exception as e:
-            print(f"[file_processor] Error leyendo PDF ({filename}): {e}")
-            return 0
-            
-    elif fn_lower.endswith('.docx') or fn_lower.endswith('.doc'):
-        try:
-            text = docx2txt.process(file_bytes_stream)
-            if text and text.strip():
-                text_by_page.append((text, 1))
-        except Exception as e:
-            print(f"[file_processor] Error leyendo Word ({filename}): {e}")
-            return 0
-
-    elif fn_lower.endswith('.xlsx'):
-        try:
-            wb = openpyxl.load_workbook(file_bytes_stream, data_only=True)
-            excel_text_parts = []
-            for sheet in wb.sheetnames:
-                ws = wb[sheet]
-                excel_text_parts.append(f"--- Hoja: {sheet} ---")
-                for row in ws.iter_rows(values_only=True):
-                    row_text = "\t".join([str(cell) for cell in row if cell is not None])
-                    if row_text.strip():
-                        excel_text_parts.append(row_text)
-            full_excel_text = "\n".join(excel_text_parts)
-            if full_excel_text.strip():
-                text_by_page.append((full_excel_text, 1))
-        except Exception as e:
-            print(f"[file_processor] Error leyendo Excel ({filename}): {e}")
-            return 0
-    else:
-        plain_text = ""
-        encodings_to_try = ["utf-8", "latin-1", "iso-8859-15", "cp1252"]
-        for enc in encodings_to_try:
-            try:
-                plain_text = file_contents.decode(enc)
-                break
-            except UnicodeDecodeError:
-                continue
-        if not plain_text:
-            try:
-                plain_text = file_contents.decode("utf-8", errors="ignore")
-            except Exception:
-                print(f"[file_processor] Error fatal de decodificación en {filename}")
-                return 0
-        if plain_text.strip():
-            text_by_page.append((plain_text, 1))
-
-    if not text_by_page:
+    try:
+        pages = _extract(file_contents, filename)
+    except Exception as exc:
+        print(f"[file_processor] Error leyendo {filename}: {exc}")
+        return 0
+    if not pages:
         return 0
 
-    # 2. SEGMENTACIÓN SEMÁNTICA (CHUNKING) Y CARGA A SUPABASE
-    chunk_size = 600
-    overlap = 150
-    saved_chunks = 0
+    client = memory_module.get_supabase()
+    if not client:
+        print("[file_processor] Sin Supabase: el texto se leyó, pero no hay dónde guardarlo.")
+        return 0
 
-    for content, page_num in text_by_page:
+    saved = 0
+    for content, page_num in pages:
         words = content.split()
-        for i in range(0, len(words), chunk_size - overlap):
-            chunk_words = words[i:i + chunk_size]
-            chunk_text = " ".join(chunk_words)
-            
-            if len(chunk_text.strip()) < 20:
+        step = 450
+        size = 600
+        for start in range(0, len(words), step):
+            chunk = " ".join(words[start : start + size]).strip()
+            if len(chunk) < 20:
                 continue
-                
-            formatted_content = f"[Archivo: {filename} | Pág: {page_num}]\n{chunk_text}"
-            tags_info = f"file_upload:{filename}"
-            
-            import tools.memory as memory_module
-            sb = memory_module.get_supabase()
-            
-            if sb:
-                try:
-                    # Llamamos a la nueva función externa que no consume RAM de tu Render
-                    embedding_vector = memory_module.obtener_embedding_externo(formatted_content)
-                    
-                    if embedding_vector:
-                        data = {
-                            "content": formatted_content,
-                            "source": "file_upload",
-                            "tags": tags_info,
-                            "embedding": embedding_vector,
-                            "filename": filename,
-                            "page_number": int(page_num)
-                        }
-                        sb.table("knowledge").insert(data).execute()
-                        saved_chunks += 1
-                except Exception as ex:
-                    print(f"[file_processor] Error inyectando chunk en Supabase: {ex}")
-
-    return saved_chunks
+            formatted = f"[Archivo: {filename} | Pág: {page_num}]\n{chunk}"
+            if _insert_chunk(client, formatted, filename, page_num):
+                saved += 1
+    return saved
