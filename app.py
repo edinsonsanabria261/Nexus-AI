@@ -40,8 +40,9 @@ def main() -> None:
     if not prompt:
         return
 
+    # Título = primera pregunta del usuario
     if len(st.session_state.messages) <= 1:
-        st.session_state.chat_title = prompt[:40]
+        st.session_state.chat_title = prompt[:60]
 
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="👤"):
@@ -54,6 +55,7 @@ def main() -> None:
             "user",
             prompt,
         )
+        st.session_state.cached_history = get_unique_sessions()
     except Exception:
         pass
 
