@@ -28,7 +28,7 @@ def main() -> None:
         f"""
         <div class="main-header">
             <h1>{config.BOT_NAME}</h1>
-            <p>Modo IA · {mode_name} · ciberseguridad defensiva</p>
+            <p>Modo IA · {mode_name} · Ciberseguridad avanzada</p>
         </div>
         """,
         unsafe_allow_html=True,
