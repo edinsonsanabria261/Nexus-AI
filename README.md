@@ -66,3 +66,10 @@ streamlit run app.py --server.port $PORT --server.address 0.0.0.0
 ```
 
 La clave de Groq va en los secretos del servicio, no en el repositorio.
+
+## Seguridad y hardening
+
+- Se valida que las URLs consultadas sean públicas y no apunten a hosts locales o privados.
+- La memoria y el contenido generado se sanitizan antes de almacenarse o reutilizarse en un prompt.
+- La web se consulta con límites de longitud y validación de host para reducir riesgo de prompt injection y abuso de acceso a servicios locales.
+- Los comandos directos (`whois`, `dns`, `ip`, `headers`) rechazan entradas no válidas o privadas.
