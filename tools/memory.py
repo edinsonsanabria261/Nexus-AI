@@ -12,6 +12,14 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 
+def _sanitize_text(value: str, max_len: int = 8000) -> str:
+    if not value:
+        return ""
+    cleaned = re.sub(r"[\x00-\x1f\x7f]+", " ", str(value))
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned[:max_len]
+
+
 def get_supabase() -> Client | None:
     if not SUPABASE_URL or not SUPABASE_KEY:
         return None
@@ -26,13 +34,20 @@ def save_knowledge(content: str, source: str = "auto", tags: str = "") -> bool:
     if not client:
         print("[memory] Sin conexión a Supabase")
         return False
+
+    content = _sanitize_text(content, 8000)
     if not content or not content.strip():
         return False
-    data = {"content": content.strip()[:8000], "source": source}
+
+    payload = {
+        "content": content.strip(),
+        "source": _sanitize_text(source, 200) or "auto",
+    }
     if tags:
-        data["tags"] = tags[:200]
+        payload["tags"] = _sanitize_text(tags, 200)
+
     try:
-        client.table("knowledge").insert(data).execute()
+        client.table("knowledge").insert(payload).execute()
         return True
     except Exception as exc:
         print(f"[memory] Error al guardar: {type(exc).__name__}: {exc}")
@@ -42,6 +57,7 @@ def save_knowledge(content: str, source: str = "auto", tags: str = "") -> bool:
 def search_knowledge(query: str, limit: int = 6) -> list:
     """Búsqueda por texto. Intenta términos clave si la query completa no da resultados."""
     client = get_supabase()
+    query = _sanitize_text(query, 120)
     if not client or not query or not query.strip():
         return []
 
@@ -60,7 +76,7 @@ def search_knowledge(query: str, limit: int = 6) -> list:
             print(f"[memory] Error al buscar: {exc}")
             return []
 
-    hits = _run(query.strip()[:120])
+    hits = _run(query.strip())
     if hits:
         return hits
 
@@ -91,7 +107,7 @@ def auto_learn(question: str, answer: str) -> bool:
         return False
 
     snippet = (
-        f"P: {question.strip()[:300]}\n"
-        f"R: {answer.strip()[:1500]}"
+        f"P: {_sanitize_text(question, 300)}\n"
+        f"R: {_sanitize_text(answer, 1500)}"
     )
     return save_knowledge(snippet, source="auto", tags="auto")

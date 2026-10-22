@@ -3,12 +3,47 @@ Herramientas de ciberseguridad para NexusSec AI
 """
 
 import hashlib
+import ipaddress
+import re
 import socket
-import requests
 from urllib.parse import urlparse
+
+import requests
 
 # Timeout general
 TIMEOUT = 8
+
+
+def _normalize_domain(value: str) -> str:
+    value = (value or "").strip().lower().replace("http://", "").replace("https://", "").split("/")[0]
+    if not value:
+        raise ValueError("Debes indicar un dominio o host válido.")
+    if value.startswith(".") or value.endswith("."):
+        value = value.strip(".")
+    if value in {"localhost", "0.0.0.0", "127.0.0.1"} or value.endswith(".localhost"):
+        raise ValueError("El dominio indicado no es seguro o no es válido.")
+    if re.fullmatch(r"[a-z0-9.-]+", value) is None:
+        raise ValueError("El dominio contiene caracteres no válidos.")
+    return value
+
+
+def _normalize_url(value: str) -> str:
+    text = (value or "").strip()
+    if not text:
+        raise ValueError("Debes indicar una URL válida.")
+    if not text.startswith(("http://", "https://")):
+        text = "https://" + text
+    parsed = urlparse(text)
+    host = (parsed.hostname or "").lower()
+    if not host or host in {"localhost", "0.0.0.0", "127.0.0.1"} or host.endswith(".localhost"):
+        raise ValueError("La URL indicada no es segura o no es válida.")
+    try:
+        ip = ipaddress.ip_address(host)
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved:
+            raise ValueError("La URL indicada apunta a un host local o no accesible.")
+    except ValueError:
+        pass
+    return text
 
 
 def tool_cve(cve_id: str) -> str:
@@ -18,10 +53,9 @@ def tool_cve(cve_id: str) -> str:
         cve_id = f"CVE-{cve_id}"
 
     try:
-        # Fuente alternativa más estable
         url = f"https://cve.circl.lu/api/cve/{cve_id}"
         r = requests.get(url, timeout=10)
-        
+
         if r.status_code == 200:
             data = r.json()
             summary = data.get("summary", "Sin descripción")
@@ -38,8 +72,7 @@ def tool_cve(cve_id: str) -> str:
                     f"**Publicado:** {published}\n\n"
                     f"**Referencias:**\n{refs_text}"
                 )
-        
-        # Si falla, mensaje claro
+
         return (
             f"### {cve_id}\n\n"
             f"No pude obtener detalles desde las APIs públicas en este momento.\n"
@@ -53,9 +86,12 @@ def tool_cve(cve_id: str) -> str:
 
 def tool_whois(domain: str) -> str:
     """Información básica de un dominio (whois simplificado)."""
-    domain = domain.strip().lower().replace("http://", "").replace("https://", "").split("/")[0]
     try:
-        # Usamos una API pública sencilla
+        domain = _normalize_domain(domain)
+    except ValueError as exc:
+        return str(exc)
+
+    try:
         url = f"https://api.whois.vu/?q={domain}"
         r = requests.get(url, timeout=TIMEOUT)
         if r.status_code != 200:
@@ -76,11 +112,13 @@ def tool_whois(domain: str) -> str:
 
 def tool_dns(domain: str) -> str:
     """Registros DNS básicos."""
-    domain = domain.strip().lower().replace("http://", "").replace("https://", "").split("/")[0]
-    results = []
-
     try:
-        # A
+        domain = _normalize_domain(domain)
+    except ValueError as exc:
+        return str(exc)
+
+    results = []
+    try:
         try:
             ips = socket.getaddrinfo(domain, None)
             a_records = list({item[4][0] for item in ips})
@@ -88,7 +126,6 @@ def tool_dns(domain: str) -> str:
         except Exception:
             results.append("**A:** No encontrado")
 
-        # Usamos Google DNS API para más registros
         for rtype in ["MX", "NS", "TXT"]:
             try:
                 url = f"https://dns.google/resolve?name={domain}&type={rtype}"
@@ -110,14 +147,21 @@ def tool_dns(domain: str) -> str:
 
 def tool_ip(ip: str) -> str:
     """Información de una IP."""
-    ip = ip.strip()
+    value = (ip or "").strip()
     try:
-        url = f"http://ip-api.com/json/{ip}?fields=status,message,country,regionName,city,isp,org,as,query,mobile,proxy,hosting"
+        parsed = ipaddress.ip_address(value)
+        if parsed.is_private or parsed.is_loopback or parsed.is_link_local or parsed.is_multicast or parsed.is_reserved:
+            return "La IP indicada apunta a un rango privado o no accesible."
+    except ValueError:
+        return "Debes proporcionar una IP pública válida."
+
+    try:
+        url = f"http://ip-api.com/json/{value}?fields=status,message,country,regionName,city,isp,org,as,query,mobile,proxy,hosting"
         r = requests.get(url, timeout=TIMEOUT)
         data = r.json()
 
         if data.get("status") != "success":
-            return f"No se pudo obtener información de **{ip}**."
+            return f"No se pudo obtener información de **{value}**."
 
         return (
             f"### IP → {data.get('query')}\n\n"
@@ -135,11 +179,13 @@ def tool_ip(ip: str) -> str:
 
 def tool_headers(url: str) -> str:
     """Analiza cabeceras de seguridad de una URL."""
-    if not url.startswith("http"):
-        url = "https://" + url
+    try:
+        safe_url = _normalize_url(url)
+    except ValueError as exc:
+        return str(exc)
 
     try:
-        r = requests.get(url, timeout=TIMEOUT, allow_redirects=True)
+        r = requests.get(safe_url, timeout=TIMEOUT, allow_redirects=True)
         headers = r.headers
 
         security_headers = {
@@ -152,7 +198,7 @@ def tool_headers(url: str) -> str:
             "Server": headers.get("Server", "N/A"),
         }
 
-        lines = [f"### Headers de seguridad → {url}\n"]
+        lines = [f"### Headers de seguridad → {safe_url}\n"]
         for k, v in security_headers.items():
             lines.append(f"- **{k}:** {v}")
 

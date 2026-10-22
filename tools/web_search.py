@@ -1,10 +1,45 @@
 """Búsqueda web por modo: texto, noticias, imágenes, videos, libros y finanzas."""
 
+import ipaddress
+import re
 import time
+from urllib.parse import urlparse
 
 import html2text
 import requests
 from duckduckgo_search import DDGS
+
+
+def _normalize_query(query: str, max_len: int = 200) -> str:
+    return re.sub(r"\s+", " ", (query or "").strip())[:max_len]
+
+
+def _is_safe_url(url: str) -> bool:
+    if not isinstance(url, str):
+        return False
+    value = url.strip()
+    if not value or not value.startswith(("http://", "https://")):
+        return False
+    try:
+        parsed = urlparse(value)
+        host = (parsed.hostname or "").lower()
+        if not host or host in {"localhost", "0.0.0.0", "127.0.0.1"} or host.endswith(".localhost"):
+            return False
+        try:
+            ip = ipaddress.ip_address(host)
+            if (
+                ip.is_private
+                or ip.is_loopback
+                or ip.is_link_local
+                or ip.is_multicast
+                or ip.is_reserved
+            ):
+                return False
+        except ValueError:
+            pass
+        return True
+    except Exception:
+        return False
 
 
 def _call(kind: str, query: str, max_results: int) -> list:
@@ -13,10 +48,11 @@ def _call(kind: str, query: str, max_results: int) -> list:
             method = getattr(ddgs, kind, None)
             if method is None:
                 return []
+            safe_query = _normalize_query(query)
             try:
-                raw = method(query, max_results=max_results, safesearch="moderate")
+                raw = method(safe_query, max_results=max_results, safesearch="moderate")
             except TypeError:
-                raw = method(query, max_results=max_results)
+                raw = method(safe_query, max_results=max_results)
             return list(raw)
     except Exception as exc:
         print(f"[web_search] {kind} falló: {exc}")
@@ -26,7 +62,7 @@ def _call(kind: str, query: str, max_results: int) -> list:
 def _link(item: dict) -> str:
     for key in ("href", "url", "content"):
         value = item.get(key)
-        if isinstance(value, str) and value.startswith("http"):
+        if isinstance(value, str) and _is_safe_url(value):
             return value
     return ""
 
@@ -42,16 +78,17 @@ def _cards_from(items: list) -> list:
             continue
         cards.append(
             {
-                "title": str(title).strip(),
+                "title": str(title).strip()[:200],
                 "url": url,
                 "snippet": str(snippet).strip()[:500],
-                "source": str(source).strip(),
+                "source": str(source).strip()[:150],
             }
         )
     return cards
 
 
 def search_cards(query: str, mode: str = "todo", max_results: int = 4) -> list:
+    query = _normalize_query(query)
     if mode == "noticias" or mode == "finanzas":
         cards = _cards_from(_call("news", query, max_results))
         return cards or _cards_from(_call("text", query, max_results))
@@ -68,6 +105,8 @@ def search_cards(query: str, mode: str = "todo", max_results: int = 4) -> list:
 
 
 def fetch_page_content(url: str, max_chars: int = 2000) -> str:
+    if not _is_safe_url(url):
+        return ""
     try:
         headers = {
             "User-Agent": (
@@ -109,7 +148,7 @@ def _context(cards: list, read_pages: bool) -> str:
     parts = []
     for index, card in enumerate(cards, start=1):
         block = f"FUENTE {index}: {card['title']}\nENLACE: {card['url']}\nNOTA: {card['snippet']}"
-        if read_pages and index <= 2 and card["url"]:
+        if read_pages and index <= 2 and card["url"] and _is_safe_url(card["url"]):
             page = fetch_page_content(card["url"])
             if page:
                 block += f"\nEXTRACTO:\n{page}"

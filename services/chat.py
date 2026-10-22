@@ -1,10 +1,20 @@
 """Orquestación de una respuesta. No dibuja la interfaz."""
 
+import re
+
 import config
 from services.modes import MODE_HINTS, normalize_mode
 from tools.cyber_tools import detect_and_run_tool
 from tools.memory import auto_learn, search_knowledge
 from tools.web_search import gather
+
+
+def _sanitize_context(value: str, limit: int = 3000) -> str:
+    if not value:
+        return ""
+    cleaned = re.sub(r"[\x00-\x1f\x7f]+", " ", value)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned[:limit]
 
 
 def generate_response(question: str, history: list, use_web: bool, mode: str) -> str:
@@ -29,6 +39,7 @@ def generate_response(question: str, history: list, use_web: bool, mode: str) ->
         memory_text = "\n".join(
             f"- {item['content']}" for item in memory_hits if item.get("content")
         )
+    memory_text = _sanitize_context(memory_text, 1800)
 
     # 3) Web
     web_context = ""
@@ -44,12 +55,15 @@ def generate_response(question: str, history: list, use_web: bool, mode: str) ->
         except Exception:
             web_context = ""
             web_preview = ""
+    web_context = _sanitize_context(web_context, 3000)
+    web_preview = _sanitize_context(web_preview, 800)
 
     # 4) Contexto de conversación
     messages = [{"role": "system", "content": config.SYSTEM_PROMPT}]
     for msg in history[-10:]:
         if msg.get("role") in ("user", "assistant") and msg.get("content"):
-            messages.append({"role": msg["role"], "content": msg["content"]})
+            safe_msg = _sanitize_context(msg["content"], 2000)
+            messages.append({"role": msg["role"], "content": safe_msg})
 
     extra = f"\n\nModo IA: {mode}. {MODE_HINTS.get(mode, '')}"
     if memory_text:
@@ -60,7 +74,8 @@ def generate_response(question: str, history: list, use_web: bool, mode: str) ->
     if web_context:
         extra += f"\n\n### Contexto de la web:\n{web_context}"
 
-    messages.append({"role": "user", "content": f"{question}{extra}"})
+    user_payload = _sanitize_context(f"{question}{extra}", 4000)
+    messages.append({"role": "user", "content": user_payload})
 
     # 5) Modelo
     try:
